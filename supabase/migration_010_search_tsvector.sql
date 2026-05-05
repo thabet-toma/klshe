@@ -1,0 +1,157 @@
+-- A4.5: Full-text search — tsvector على products (name, brand) و vendors (name, slug)
+-- + فهرس GIN + دالة search_storefront للواجهة العامة.
+
+-- ----------------------------------------------------------------------------
+-- 1) أعمدة مولَّدة + فهارس GIN
+-- ----------------------------------------------------------------------------
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'products'
+      and column_name = 'search_vector'
+  ) then
+    alter table public.products
+      add column search_vector tsvector
+      generated always as (
+        setweight(to_tsvector('simple', coalesce(name, '')), 'A')
+        || setweight(to_tsvector('simple', coalesce(brand, '')), 'B')
+      ) stored;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'vendors'
+      and column_name = 'search_vector'
+  ) then
+    alter table public.vendors
+      add column search_vector tsvector
+      generated always as (
+        setweight(to_tsvector('simple', coalesce(name, '')), 'A')
+        || setweight(to_tsvector('simple', coalesce(slug, '')), 'B')
+      ) stored;
+  end if;
+end $$;
+
+create index if not exists idx_products_search_vector
+  on public.products using gin (search_vector);
+
+create index if not exists idx_vendors_search_vector
+  on public.vendors using gin (search_vector);
+
+comment on column public.products.search_vector is
+  'Full-text vector (simple config) لـ name + brand — بحث الواجهة.';
+comment on column public.vendors.search_vector is
+  'Full-text vector (simple config) لـ name + slug — بحث الواجهة.';
+
+-- ----------------------------------------------------------------------------
+-- 2) RPC: نتائج JSON متوافقة مع mapVendor / mapProduct في التطبيق
+-- ----------------------------------------------------------------------------
+
+create or replace function public.search_storefront(
+  search_query text,
+  vendor_limit integer default 20,
+  product_limit integer default 40
+)
+returns json
+language plpgsql
+stable
+security invoker
+set search_path = public
+as $$
+declare
+  q tsquery;
+  q_trim text;
+  vendors_json json;
+  products_json json;
+  vl integer := greatest(1, least(coalesce(vendor_limit, 20), 100));
+  pl integer := greatest(1, least(coalesce(product_limit, 40), 200));
+begin
+  q_trim := left(trim(coalesce(search_query, '')), 200);
+  if length(q_trim) = 0 then
+    return json_build_object(
+      'vendors', '[]'::json,
+      'products', '[]'::json
+    );
+  end if;
+
+  q := websearch_to_tsquery('simple', q_trim);
+  if q is null or q = ''::tsquery then
+    return json_build_object(
+      'vendors', '[]'::json,
+      'products', '[]'::json
+    );
+  end if;
+
+  select coalesce(json_agg(row_to_json(t)), '[]'::json)
+  into vendors_json
+  from (
+    select
+      v.id,
+      v.slug,
+      v.name,
+      v.description,
+      v.logo_url,
+      v.banner_url,
+      v.category_id,
+      v.vendor_category_id,
+      v.default_prep_minutes,
+      v.min_order_amount,
+      v.delivery_fee_base
+    from public.vendors v
+    where v.is_active = true
+      and v.search_vector @@ q
+    order by ts_rank_cd(v.search_vector, q) desc
+    limit vl
+  ) t;
+
+  select coalesce(json_agg(row_to_json(p)), '[]'::json)
+  into products_json
+  from (
+    select
+      pr.id,
+      pr.name,
+      pr.brand,
+      pr.price,
+      pr.old_price,
+      pr.unit,
+      pr.image,
+      pr.badge,
+      pr.category_id,
+      pr.vendor_id,
+      pr.vendor_category_id,
+      pr.menu_category_id,
+      pr.is_offer,
+      pr.is_trending,
+      pr.is_active,
+      ven.name as vendor_name,
+      ven.slug as vendor_slug
+    from public.products pr
+    inner join public.vendors ven on ven.id = pr.vendor_id
+    where pr.is_active = true
+      and ven.is_active = true
+      and pr.search_vector @@ q
+    order by ts_rank_cd(pr.search_vector, q) desc
+    limit pl
+  ) p;
+
+  return json_build_object(
+    'vendors', vendors_json,
+    'products', products_json
+  );
+end;
+$$;
+
+comment on function public.search_storefront(text, integer, integer) is
+  'بحث المتجر العام: متاجر ومنتجات نشطة عبر tsvector (simple).';
+
+grant execute on function public.search_storefront(text, integer, integer)
+  to anon, authenticated;

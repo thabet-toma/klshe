@@ -1,0 +1,20 @@
+import { redirect } from "next/navigation";
+import RoleSwitcher from "../components/ui/RoleSwitcher";
+import { getCurrentUserRoles } from "@/lib/auth/roles";
+
+export default async function DriverRouteLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const roles = await getCurrentUserRoles();
+  if (roles.authenticated && !roles.isDriver && !roles.isAdmin) {
+    redirect("/");
+  }
+  return (
+    <>
+      {children}
+      <RoleSwitcher roles={roles} />
+    </>
+  );
+}
