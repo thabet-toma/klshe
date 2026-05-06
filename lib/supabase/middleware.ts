@@ -1,72 +1,8 @@
-import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabasePublishableKey, getSupabaseUrl } from "./env";
+import { getFirebaseSessionFromRequest } from "@/lib/firebase/session";
 
 export async function updateSession(request: NextRequest) {
-  const url = getSupabaseUrl();
-  const key = getSupabasePublishableKey();
-
-  if (!url || !key) {
-    return NextResponse.next({ request });
-  }
-
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return request.cookies.getAll();
-      },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
-        supabaseResponse = NextResponse.next({
-          request,
-        });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          supabaseResponse.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  let isPlatformAdmin = false;
-  let hasVendorStaff = false;
-  let isDriver = false;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    isPlatformAdmin = profile?.role === "platform_admin";
-    isDriver = profile?.role === "driver";
-
-    const { data: staffRow } = await supabase
-      .from("vendor_staff")
-      .select("id")
-      .eq("profile_id", user.id)
-      .limit(1)
-      .maybeSingle();
-    hasVendorStaff = Boolean(staffRow);
-
-    if (!isDriver) {
-      const { data: driverRow } = await supabase
-        .from("delivery_drivers")
-        .select("id")
-        .eq("user_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      isDriver = Boolean(driverRow);
-    }
-  }
+  const session = getFirebaseSessionFromRequest(request);
 
   const path = request.nextUrl.pathname;
   const isAdminPath = path.startsWith("/admin");
@@ -74,86 +10,55 @@ export async function updateSession(request: NextRequest) {
   const isDriverPath = path.startsWith("/driver");
   const isLoginPath = path === "/login";
 
-  if (isAdminPath && !user) {
+  const role = session?.role;
+  const isPlatformAdmin = role === "platform_admin";
+  const isDriver = role === "driver";
+
+  // Check vendor_staff from Supabase is handled in API guards; middleware uses cookie role.
+  const hasVendorStaff = role === "vendor_staff" || role === "platform_admin";
+
+  if ((isAdminPath || isVendorPath || isDriverPath) && !session) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set(
-      "next",
-      `${path}${request.nextUrl.search}`,
-    );
+    redirectUrl.searchParams.set("next", `${path}${request.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isAdminPath && user && !isPlatformAdmin) {
+  if (isAdminPath && session && !isPlatformAdmin) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("error", "forbidden");
-    redirectUrl.searchParams.set(
-      "next",
-      `${path}${request.nextUrl.search}`,
-    );
+    redirectUrl.searchParams.set("next", `${path}${request.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isVendorPath && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set(
-      "next",
-      `${path}${request.nextUrl.search}`,
-    );
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (isVendorPath && user && !hasVendorStaff) {
+  if (isVendorPath && session && !hasVendorStaff) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("error", "vendor_forbidden");
-    redirectUrl.searchParams.set(
-      "next",
-      `${path}${request.nextUrl.search}`,
-    );
+    redirectUrl.searchParams.set("next", `${path}${request.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isDriverPath && !user) {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
-    redirectUrl.searchParams.set(
-      "next",
-      `${path}${request.nextUrl.search}`,
-    );
-    return NextResponse.redirect(redirectUrl);
-  }
-
-  if (isDriverPath && user && !isDriver) {
+  if (isDriverPath && session && !isDriver) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("error", "driver_forbidden");
-    redirectUrl.searchParams.set(
-      "next",
-      `${path}${request.nextUrl.search}`,
-    );
+    redirectUrl.searchParams.set("next", `${path}${request.nextUrl.search}`);
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isLoginPath && user) {
+  if (isLoginPath && session) {
     const nextParam = request.nextUrl.searchParams.get("next");
     const safeNext =
       nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
         ? nextParam
         : "/admin";
-    if (safeNext.startsWith("/admin") && !isPlatformAdmin) {
-      return supabaseResponse;
-    }
-    if (safeNext.startsWith("/vendor") && !hasVendorStaff) {
-      return supabaseResponse;
-    }
-    if (safeNext.startsWith("/driver") && !isDriver) {
-      return supabaseResponse;
-    }
+    if (safeNext.startsWith("/admin") && !isPlatformAdmin) return NextResponse.next({ request });
+    if (safeNext.startsWith("/vendor") && !hasVendorStaff) return NextResponse.next({ request });
+    if (safeNext.startsWith("/driver") && !isDriver) return NextResponse.next({ request });
     return NextResponse.redirect(new URL(safeNext, request.url));
   }
 
-  return supabaseResponse;
+  return NextResponse.next({ request });
 }
