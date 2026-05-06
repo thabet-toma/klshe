@@ -1,28 +1,39 @@
+const CACHE_VERSION = "jetek-v2";
+
 self.addEventListener("install", (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open("jetek-v1").then((cache) => cache.addAll(["/", "/manifest.webmanifest"])),
+    caches.open(CACHE_VERSION).then((cache) =>
+      cache.addAll(["/manifest.webmanifest"])
+    )
   );
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))
+      )
+    ).then(() => self.clients.claim())
+  );
 });
 
+// Network-first: always try fresh content, fall back to cache only if offline
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
+  // Never cache API calls or auth routes
+  if (req.url.includes("/api/") || req.url.includes("/auth/")) return;
+
   event.respondWith(
-    caches.match(req).then(
-      (cached) =>
-        cached ||
-        fetch(req)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open("jetek-v1").then((cache) => cache.put(req, copy));
-            return res;
-          })
-          .catch(() => caches.match("/") || Response.error()),
-    ),
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+        return res;
+      })
+      .catch(() => caches.match(req))
   );
 });
 
