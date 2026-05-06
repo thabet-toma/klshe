@@ -82,7 +82,7 @@ export default function LoginForm({
         : await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
       await finishLogin(await credential.user.getIdToken());
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
+      const code = (err as { code?: string }).code ?? "";
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
         setLocalError("البريد الإلكتروني أو كلمة المرور غير صحيحة.");
       } else if (code === "auth/email-already-in-use") {
@@ -90,7 +90,7 @@ export default function LoginForm({
       } else if (code === "auth/weak-password") {
         setLocalError("كلمة المرور ضعيفة جداً (6 أحرف على الأقل).");
       } else {
-        setLocalError(err instanceof Error ? err.message : "حدث خطأ غير متوقع.");
+        setLocalError(`خطأ: ${code || (err instanceof Error ? err.message : "غير معروف")}`);
       }
     } finally {
       setLoading(false);
@@ -106,13 +106,15 @@ export default function LoginForm({
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       await finishLogin(await result.user.getIdToken());
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
+      const code = (err as { code?: string }).code ?? "";
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // user closed popup — not an error
+        // user cancelled — don't show error
       } else if (code === "auth/popup-blocked") {
-        setLocalError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة وأعد المحاولة.");
+        setLocalError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.");
+      } else if (code === "auth/unauthorized-domain") {
+        setLocalError("هذا النطاق غير مصرّح في Firebase. أضف النطاق في Firebase Console → Authentication → Settings → Authorized domains.");
       } else {
-        setLocalError(err instanceof Error ? err.message : "فشل تسجيل الدخول بـ Google.");
+        setLocalError(`خطأ Google: ${code || (err instanceof Error ? err.message : "غير معروف")}`);
       }
     } finally {
       setLoading(false);
@@ -165,7 +167,7 @@ export default function LoginForm({
           className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
         >
           <GoogleIcon />
-          المتابعة مع Google
+          {loading ? "جارٍ…" : "المتابعة مع Google"}
         </button>
 
         <div className="my-4 flex items-center gap-3">
