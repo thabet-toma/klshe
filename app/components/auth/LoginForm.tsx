@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
 import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
@@ -38,6 +39,27 @@ export default function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+
+  // Handle redirect result after Google sign-in redirect flow
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    setLoading(true);
+    getRedirectResult(firebaseAuth)
+      .then(async (result) => {
+        if (!result) return;
+        const idToken = await result.user.getIdToken();
+        const { role } = await createSession(idToken);
+        redirectAfterLogin(role);
+      })
+      .catch((err: unknown) => {
+        const code = (err as { code?: string }).code;
+        if (code && code !== "auth/no-auth-event") {
+          setLocalError("فشل تسجيل الدخول بـ Google. أعد المحاولة.");
+        }
+      })
+      .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const errorMessage = useMemo(() => {
     if (errorCode === "forbidden") return "هذا الحساب ليس ضمن مديري المنصة.";
@@ -105,18 +127,10 @@ export default function LoginForm({
     }
     setLoading(true);
     try {
-      const credential = await signInWithPopup(firebaseAuth, googleProvider);
-      const idToken = await credential.user.getIdToken();
-      const { role } = await createSession(idToken);
-      redirectAfterLogin(role);
+      await signInWithRedirect(firebaseAuth, googleProvider);
+      // Page will redirect — result handled in useEffect above
     } catch (err: unknown) {
-      const code = (err as { code?: string }).code;
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // user closed popup — not an error
-      } else {
-        setLocalError(err instanceof Error ? err.message : "فشل تسجيل الدخول بـ Google.");
-      }
-    } finally {
+      setLocalError(err instanceof Error ? err.message : "فشل تسجيل الدخول بـ Google.");
       setLoading(false);
     }
   }
