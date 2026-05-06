@@ -31,7 +31,7 @@ export async function requireVendorAccess(): Promise<{
   const { data: rows, error: staffError } = await supabase
     .from("vendor_staff")
     .select("vendor_id")
-    .eq("profile_id", session.uid);
+    .eq("profile_id", session.profileId);
 
   if (staffError) {
     return {

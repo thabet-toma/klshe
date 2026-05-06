@@ -10,7 +10,12 @@
       "Read(//c/Users/asus/Desktop/klshe/.vercel/**)",
       "Read(//c/Users/asus/Desktop/klshe/**)",
       "Bash(vercel env *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(vercel --prod)",
+      "Bash(git commit -m 'fix: use signInWithRedirect for Google auth and handle redirect result on mount *)",
+      "Bash(git commit -m 'fix: convert Firebase UID to deterministic UUID for Supabase profiles *)"
     ]
   }
 }
