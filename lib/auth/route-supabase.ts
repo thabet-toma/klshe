@@ -1,32 +1,53 @@
-import { cookies } from "next/headers";
-import { createServerClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/types";
-import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/supabase/env";
+import { getFirebaseSession } from "@/lib/firebase/session";
+import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
 
-/** عميل Supabase مع كوكي الجلسة — للمسارات التي تعتمد على RLS + JWT الزائر. */
-export async function createRouteHandlerSupabase(): Promise<
-  SupabaseClient<Database> | null
-> {
-  const url = getSupabaseUrl();
-  const key = getSupabasePublishableKey();
-  if (!url || !key) return null;
+/**
+ * Compatibility layer: returns a Supabase client (service role) with a patched
+ * `.auth.getUser()` that reads from Firebase session cookies instead of
+ * Supabase Auth. This lets existing API routes work without changes.
+ */
+export async function createRouteHandlerSupabase() {
+  if (!isSupabaseServerConfigured) return null;
 
-  const cookieStore = await cookies();
-  return createServerClient<Database>(url, key, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options),
-          );
-        } catch {
-          /* Server Component قد يمنع set في بعض السياقات */
-        }
-      },
+  const session = await getFirebaseSession();
+  const supabase = createServerSupabase();
+
+  // Patch auth.getUser to return the Firebase user from cookies
+  const originalAuth = supabase.auth;
+  supabase.auth = {
+    ...originalAuth,
+    getUser: async () => {
+      if (!session) {
+        return { data: { user: null }, error: null } as any;
+      }
+      return {
+        data: {
+          user: {
+            id: session.profileId,
+            email: session.email ?? "",
+            role: session.role,
+          },
+        },
+        error: null,
+      } as any;
     },
-  });
+    getSession: async () => {
+      if (!session) {
+        return { data: { session: null }, error: null } as any;
+      }
+      return {
+        data: {
+          session: {
+            user: {
+              id: session.profileId,
+              email: session.email ?? "",
+            },
+          },
+        },
+        error: null,
+      } as any;
+    },
+  } as any;
+
+  return supabase;
 }

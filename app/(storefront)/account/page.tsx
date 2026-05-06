@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Heart, Loader2, LogOut, MapPin, ShoppingBag, User } from "lucide-react";
-import { createBrowserSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
 import PushSubscriptionCard from "@/app/components/storefront/PushSubscriptionCard";
 import AccountSettingsCard from "@/app/components/storefront/AccountSettingsCard";
 
@@ -14,39 +15,22 @@ export default function AccountPage() {
   const [email, setEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        if (!isSupabaseConfigured) {
-          if (!cancelled) {
-            setEmail(null);
-            setLoading(false);
-          }
-          return;
-        }
-        try {
-          const supabase = createBrowserSupabase();
-          const { data } = await supabase.auth.getSession();
-          if (!cancelled) {
-            setEmail(data.session?.user?.email ?? null);
-          }
-        } catch {
-          if (!cancelled) setEmail(null);
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
+    if (!isFirebaseConfigured) {
+      setLoading(false);
+      return;
+    }
+    const unsub = onAuthStateChanged(firebaseAuth, (user) => {
+      setEmail(user?.email ?? null);
+      setLoading(false);
+    });
+    return unsub;
   }, []);
 
-  async function signOut() {
-    if (!isSupabaseConfigured) return;
-    const supabase = createBrowserSupabase();
-    await supabase.auth.signOut();
+  async function handleSignOut() {
+    if (isFirebaseConfigured) {
+      await signOut(firebaseAuth);
+    }
+    await fetch("/api/auth/session", { method: "DELETE" });
     setEmail(null);
     router.refresh();
   }
@@ -70,15 +54,14 @@ export default function AccountPage() {
           <div>
             <h1 className="text-lg font-extrabold text-neutral-900">حسابي</h1>
             <p className="text-sm text-neutral-500">
-              طلباتك وبياناتك مرتبطة بحسابك عند تفعيل Supabase Auth.
+              طلباتك وبياناتك مرتبطة بحسابك.
             </p>
           </div>
         </div>
 
-        {!isSupabaseConfigured ? (
+        {!isFirebaseConfigured ? (
           <p className="mt-4 text-sm leading-relaxed text-neutral-600">
-            وضع العرض: لم تُضبط مفاتيح Supabase. عند الربط يمكن تسجيل الدخول بالبريد
-            (رابط سحري) ومزامنة الطلبات لاحقاً.
+            وضع العرض: لم تُضبط مفاتيح Firebase.
           </p>
         ) : email ? (
           <div className="mt-6 space-y-4">
@@ -88,7 +71,7 @@ export default function AccountPage() {
             </p>
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={() => void handleSignOut()}
               className="inline-flex items-center gap-2 rounded-2xl bg-neutral-900 px-4 py-2.5 text-sm font-extrabold text-white"
             >
               <LogOut className="h-4 w-4" strokeWidth={2.4} />
@@ -98,8 +81,7 @@ export default function AccountPage() {
         ) : (
           <div className="mt-6 space-y-3">
             <p className="text-sm text-neutral-600">
-              لست مسجّلاً للدخول. سجّل الدخول لمتابعة الطلبات وللمفضلة عبر السحابة
-              لاحقاً.
+              لست مسجّلاً للدخول. سجّل الدخول لمتابعة الطلبات والمفضلة.
             </p>
             <Link
               href="/login?next=/account"

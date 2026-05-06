@@ -15,7 +15,10 @@
       "Bash(git push *)",
       "Bash(vercel --prod)",
       "Bash(git commit -m 'fix: use signInWithRedirect for Google auth and handle redirect result on mount *)",
-      "Bash(git commit -m 'fix: convert Firebase UID to deterministic UUID for Supabase profiles *)"
+      "Bash(git commit -m 'fix: convert Firebase UID to deterministic UUID for Supabase profiles *)",
+      "Bash(git commit -m 'fix: switch to signInWithPopup and fix customer redirect loop *)",
+      "WebFetch(domain:klshe.vercel.app)",
+      "Bash(git commit -m 'fix: show all Firebase errors clearly for debugging *)"
     ]
   }
 }

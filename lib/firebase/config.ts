@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,6 +12,23 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 export const firebaseAuth = getAuth(app);
+
+// Use localStorage persistence instead of sessionStorage to avoid
+// "missing initial state" errors in WebViews and partitioned storage environments.
+if (typeof window !== "undefined") {
+  void setPersistence(firebaseAuth, browserLocalPersistence);
+  // Clear stale redirect state left by previous signInWithRedirect attempts
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = sessionStorage.key(i);
+      if (key?.startsWith("firebase:pendingRedirect:")) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // sessionStorage inaccessible — fine, nothing to clear
+  }
+}
 
 export const isFirebaseConfigured = Boolean(
   process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
