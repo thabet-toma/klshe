@@ -1,13 +1,12 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
 import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
@@ -21,8 +20,9 @@ async function createSession(idToken: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken }),
   });
-  if (!res.ok) throw new Error((await res.json()).error ?? "فشل إنشاء الجلسة.");
-  return res.json() as Promise<{ role: string }>;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "فشل إنشاء الجلسة.");
+  return data as { ok: boolean; role: string };
 }
 
 export default function LoginForm({
@@ -30,7 +30,7 @@ export default function LoginForm({
   errorCode,
 }: {
   nextPath: string;
-  supabaseConfigured?: boolean; // kept for backwards compat, unused
+  supabaseConfigured?: boolean;
   errorCode?: string;
 }) {
   const router = useRouter();
@@ -39,27 +39,6 @@ export default function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-
-  // Handle redirect result after Google sign-in redirect flow
-  useEffect(() => {
-    if (!isFirebaseConfigured) return;
-    setLoading(true);
-    getRedirectResult(firebaseAuth)
-      .then(async (result) => {
-        if (!result) return;
-        const idToken = await result.user.getIdToken();
-        const { role } = await createSession(idToken);
-        redirectAfterLogin(role);
-      })
-      .catch((err: unknown) => {
-        const code = (err as { code?: string }).code;
-        if (code && code !== "auth/no-auth-event") {
-          setLocalError("فشل تسجيل الدخول بـ Google. أعد المحاولة.");
-        }
-      })
-      .finally(() => setLoading(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const errorMessage = useMemo(() => {
     if (errorCode === "forbidden") return "هذا الحساب ليس ضمن مديري المنصة.";
@@ -72,37 +51,36 @@ export default function LoginForm({
   function redirectAfterLogin(role: string) {
     const safe =
       nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : null;
-    if (safe?.startsWith("/admin") && role === "platform_admin") return router.push(safe);
-    if (safe?.startsWith("/vendor") && (role === "vendor_staff" || role === "platform_admin")) return router.push(safe);
-    if (safe?.startsWith("/driver") && role === "driver") return router.push(safe);
-    if (role === "platform_admin") return router.push("/admin");
-    if (role === "vendor_staff") return router.push("/vendor");
-    if (role === "driver") return router.push("/driver");
-    router.push(safe ?? "/");
+
+    if (safe && safe !== "/admin") {
+      if (safe.startsWith("/admin") && role === "platform_admin") { router.push(safe); return; }
+      if (safe.startsWith("/vendor") && (role === "vendor_staff" || role === "platform_admin")) { router.push(safe); return; }
+      if (safe.startsWith("/driver") && role === "driver") { router.push(safe); return; }
+    }
+
+    if (role === "platform_admin") { router.push("/admin"); return; }
+    if (role === "vendor_staff") { router.push("/vendor"); return; }
+    if (role === "driver") { router.push("/driver"); return; }
+    router.push("/");
+  }
+
+  async function finishLogin(idToken: string) {
+    const { role } = await createSession(idToken);
+    redirectAfterLogin(role);
   }
 
   async function handleEmailAuth(e: React.FormEvent) {
     e.preventDefault();
     setLocalError(null);
-    if (!isFirebaseConfigured) {
-      setLocalError("لم يُضبط Firebase في البيئة.");
-      return;
-    }
-    if (!email.trim() || !password) {
-      setLocalError("أدخل البريد الإلكتروني وكلمة المرور.");
-      return;
-    }
+    if (!isFirebaseConfigured) { setLocalError("لم يُضبط Firebase في البيئة."); return; }
+    if (!email.trim() || !password) { setLocalError("أدخل البريد الإلكتروني وكلمة المرور."); return; }
+
     setLoading(true);
     try {
-      let credential;
-      if (tab === "login") {
-        credential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
-      } else {
-        credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
-      }
-      const idToken = await credential.user.getIdToken();
-      const { role } = await createSession(idToken);
-      redirectAfterLogin(role);
+      const credential = tab === "login"
+        ? await signInWithEmailAndPassword(firebaseAuth, email.trim(), password)
+        : await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      await finishLogin(await credential.user.getIdToken());
     } catch (err: unknown) {
       const code = (err as { code?: string }).code;
       if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
@@ -121,16 +99,22 @@ export default function LoginForm({
 
   async function handleGoogle() {
     setLocalError(null);
-    if (!isFirebaseConfigured) {
-      setLocalError("لم يُضبط Firebase في البيئة.");
-      return;
-    }
+    if (!isFirebaseConfigured) { setLocalError("لم يُضبط Firebase في البيئة."); return; }
+
     setLoading(true);
     try {
-      await signInWithRedirect(firebaseAuth, googleProvider);
-      // Page will redirect — result handled in useEffect above
+      const result = await signInWithPopup(firebaseAuth, googleProvider);
+      await finishLogin(await result.user.getIdToken());
     } catch (err: unknown) {
-      setLocalError(err instanceof Error ? err.message : "فشل تسجيل الدخول بـ Google.");
+      const code = (err as { code?: string }).code;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
+        // user closed popup — not an error
+      } else if (code === "auth/popup-blocked") {
+        setLocalError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة وأعد المحاولة.");
+      } else {
+        setLocalError(err instanceof Error ? err.message : "فشل تسجيل الدخول بـ Google.");
+      }
+    } finally {
       setLoading(false);
     }
   }
