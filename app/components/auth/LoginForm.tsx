@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -39,6 +39,14 @@ export default function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [isNative, setIsNative] = useState(false);
+
+  useEffect(() => {
+    // Detect Capacitor native platform — Google popup is blocked in WebView
+    import("@capacitor/core").then(({ Capacitor }) => {
+      setIsNative(Capacitor.isNativePlatform());
+    }).catch(() => { /* not in Capacitor env */ });
+  }, []);
 
   const errorMessage = useMemo(() => {
     if (errorCode === "forbidden") return "هذا الحساب ليس ضمن مديري المنصة.";
@@ -159,22 +167,28 @@ export default function LoginForm({
           </button>
         </div>
 
-        {/* Google sign-in */}
-        <button
-          type="button"
-          onClick={handleGoogle}
-          disabled={loading || !isFirebaseConfigured}
-          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-        >
-          <GoogleIcon />
-          {loading ? "جارٍ…" : "المتابعة مع Google"}
-        </button>
+        {/* Google sign-in — hidden in Capacitor WebView where popups are blocked */}
+        {!isNative && (
+          <>
+            <button
+              type="button"
+              onClick={handleGoogle}
+              disabled={loading || !isFirebaseConfigured}
+              className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+            >
+              <GoogleIcon />
+              {loading ? "جارٍ…" : "المتابعة مع Google"}
+            </button>
 
-        <div className="my-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-black/8" />
-          <span className="text-xs text-neutral-400">أو</span>
-          <div className="h-px flex-1 bg-black/8" />
-        </div>
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-black/8" />
+              <span className="text-xs text-neutral-400">أو</span>
+              <div className="h-px flex-1 bg-black/8" />
+            </div>
+          </>
+        )}
+
+        {isNative && <div className="my-4" />}
 
         {/* Email/password form */}
         <form onSubmit={handleEmailAuth} className="space-y-4">
