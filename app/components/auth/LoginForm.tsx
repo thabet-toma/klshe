@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
+import { firebaseAuth, isFirebaseConfigured, clearFirebaseRedirectState } from "@/lib/firebase/config";
 import { BRAND_NAME } from "@/lib/brand";
 
 const googleProvider = new GoogleAuthProvider();
@@ -39,14 +41,22 @@ export default function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [isNative, setIsNative] = useState(false);
+  const redirectHandled = useRef(false);
 
+  // On mount, pick up any pending signInWithRedirect result
   useEffect(() => {
-    // Detect Capacitor native platform — Google popup is blocked in WebView
-    import("@capacitor/core").then(({ Capacitor }) => {
-      setIsNative(Capacitor.isNativePlatform());
-    }).catch(() => { /* not in Capacitor env */ });
-  }, []);
+    if (redirectHandled.current || !isFirebaseConfigured) return;
+    redirectHandled.current = true;
+    void getRedirectResult(firebaseAuth).then(async (result) => {
+      if (result?.user) {
+        try {
+          await finishLogin(await result.user.getIdToken());
+        } catch {
+          setLocalError("تعذّر إكمال تسجيل الدخول بعد إعادة التوجيه.");
+        }
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const errorMessage = useMemo(() => {
     if (errorCode === "forbidden") return "هذا الحساب ليس ضمن مديري المنصة.";
@@ -110,6 +120,9 @@ export default function LoginForm({
     if (!isFirebaseConfigured) { setLocalError("لم يُضبط Firebase في البيئة."); return; }
 
     setLoading(true);
+    // Clear stale redirect state before attempting sign-in
+    clearFirebaseRedirectState();
+
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       await finishLogin(await result.user.getIdToken());
@@ -118,7 +131,13 @@ export default function LoginForm({
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // user cancelled — don't show error
       } else if (code === "auth/popup-blocked") {
-        setLocalError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.");
+        // Popup blocked on mobile — fall back to redirect
+        try {
+          await signInWithRedirect(firebaseAuth, googleProvider);
+          // The page will redirect away — no further action needed
+        } catch {
+          setLocalError("المتصفح منع تسجيل الدخول. حاول مرة أخرى أو استخدم البريد الإلكتروني.");
+        }
       } else if (code === "auth/unauthorized-domain") {
         setLocalError("هذا النطاق غير مصرّح في Firebase. أضف النطاق في Firebase Console → Authentication → Settings → Authorized domains.");
       } else {
@@ -167,28 +186,22 @@ export default function LoginForm({
           </button>
         </div>
 
-        {/* Google sign-in — hidden in Capacitor WebView where popups are blocked */}
-        {!isNative && (
-          <>
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={loading || !isFirebaseConfigured}
-              className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-            >
-              <GoogleIcon />
-              {loading ? "جارٍ…" : "المتابعة مع Google"}
-            </button>
+        {/* Google sign-in */}
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading || !isFirebaseConfigured}
+          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          <GoogleIcon />
+          {loading ? "جارٍ…" : "المتابعة مع Google"}
+        </button>
 
-            <div className="my-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-black/8" />
-              <span className="text-xs text-neutral-400">أو</span>
-              <div className="h-px flex-1 bg-black/8" />
-            </div>
-          </>
-        )}
-
-        {isNative && <div className="my-4" />}
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-black/8" />
+          <span className="text-xs text-neutral-400">أو</span>
+          <div className="h-px flex-1 bg-black/8" />
+        </div>
 
         {/* Email/password form */}
         <form onSubmit={handleEmailAuth} className="space-y-4">

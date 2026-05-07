@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Power, Save, Store } from "lucide-react";
+import { Loader2, Plus, Power, Save, Store, X } from "lucide-react";
 
 type Vendor = {
   id: string;
@@ -17,6 +17,11 @@ export default function AdminVendorsClient() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newCommission, setNewCommission] = useState("10");
+  const [newDescription, setNewDescription] = useState("");
+  const [adding, setAdding] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -36,6 +41,35 @@ export default function AdminVendorsClient() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function addStore(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setAdding(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/admin/vendors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newName.trim(),
+          commission_rate: Number(newCommission) || 10,
+          description: newDescription.trim() || undefined,
+        }),
+      });
+      const d = (await r.json()) as { vendor?: Vendor; error?: string };
+      if (!r.ok) throw new Error(d.error ?? "فشل الإضافة.");
+      setShowAddForm(false);
+      setNewName("");
+      setNewCommission("10");
+      setNewDescription("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "خطأ.");
+    } finally {
+      setAdding(false);
+    }
+  }
 
   async function toggle(id: string, isActive: boolean) {
     setBusyId(id);
@@ -86,6 +120,87 @@ export default function AdminVendorsClient() {
           {error}
         </div>
       )}
+
+      {/* Add store button / form */}
+      <div className="rounded-2xl bg-white shadow-soft ring-1 ring-black/5">
+        {!showAddForm ? (
+          <div className="flex items-center justify-between px-4 py-3">
+            <p className="text-sm font-bold text-neutral-700">
+              إجمالي المتاجر: <span className="text-brand-600">{rows.length}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-3 py-2 text-xs font-extrabold text-white hover:bg-brand-700"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.6} />
+              إضافة متجر
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={addStore} className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-extrabold text-neutral-900">إضافة متجر جديد</p>
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+              >
+                <X className="h-4 w-4" strokeWidth={2.4} />
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="block sm:col-span-2">
+                <span className="mb-1 block text-[12px] font-bold text-neutral-500">اسم المتجر *</span>
+                <input
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-black/10 bg-neutral-50 px-3 py-2 text-sm font-bold"
+                  placeholder="مثال: متجر العطارة"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[12px] font-bold text-neutral-500">العمولة %</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={newCommission}
+                  onChange={(e) => setNewCommission(e.target.value)}
+                  className="w-full rounded-xl border border-black/10 bg-neutral-50 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block sm:col-span-3">
+                <span className="mb-1 block text-[12px] font-bold text-neutral-500">وصف (اختياري)</span>
+                <input
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  className="w-full rounded-xl border border-black/10 bg-neutral-50 px-3 py-2 text-sm"
+                  placeholder="وصف مختصر للمتجر"
+                />
+              </label>
+            </div>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="submit"
+                disabled={adding || !newName.trim()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50"
+              >
+                {adding ? "جارٍ…" : "إضافة المتجر"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddForm(false)}
+                className="rounded-xl border border-black/10 bg-white px-4 py-2 text-xs font-bold text-neutral-700"
+              >
+                إلغاء
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
       {rows.length === 0 ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-white p-8 text-center text-sm text-neutral-500 ring-1 ring-black/5">
           <Store className="h-6 w-6 text-neutral-400" />

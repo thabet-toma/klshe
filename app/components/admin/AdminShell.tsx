@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
   ClipboardList,
@@ -45,13 +45,21 @@ export default function AdminShell({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/admin/onboarding/count", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d: { pending?: number }) => setPendingCount(d.pending ?? 0))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex min-h-dvh bg-neutral-100">
       {/* Sidebar - Desktop */}
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-s border-black/5 bg-white px-3 py-5 lg:flex">
         <SidebarBrand />
-        <NavList pathname={pathname} />
+        <NavList pathname={pathname} pendingCount={pendingCount} />
       </aside>
 
       {/* Sidebar - Mobile drawer */}
@@ -75,7 +83,7 @@ export default function AdminShell({
                 <X className="h-5 w-5" strokeWidth={2.4} />
               </button>
             </div>
-            <NavList pathname={pathname} onClick={() => setMobileOpen(false)} />
+            <NavList pathname={pathname} pendingCount={pendingCount} onClick={() => setMobileOpen(false)} />
           </aside>
         </>
       )}
@@ -138,9 +146,11 @@ function SidebarBrand() {
 
 function NavList({
   pathname,
+  pendingCount,
   onClick,
 }: {
   pathname: string;
+  pendingCount?: number;
   onClick?: () => void;
 }) {
   return (
@@ -151,6 +161,7 @@ function NavList({
           it.href === "/admin"
             ? pathname === "/admin"
             : pathname.startsWith(it.href);
+        const isOnboarding = it.href === "/admin/onboarding";
         return (
           <li key={it.href}>
             <Link
@@ -164,7 +175,12 @@ function NavList({
             >
               <Icon className="h-5 w-5" strokeWidth={2.2} />
               {it.label}
-              {active && (
+              {isOnboarding && pendingCount !== undefined && pendingCount > 0 && (
+                <span className="me-1 ms-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-extrabold text-white leading-none">
+                  {pendingCount > 99 ? "99+" : pendingCount}
+                </span>
+              )}
+              {!isOnboarding && active && (
                 <span className="ms-auto h-2 w-2 rounded-full bg-brand-500" />
               )}
             </Link>

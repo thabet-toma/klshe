@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
+import { createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
+import { firebaseAuth, isFirebaseConfigured, clearFirebaseRedirectState } from "@/lib/firebase/config";
 import { BRAND_NAME } from "@/lib/brand";
 
 const googleProvider = new GoogleAuthProvider();
@@ -24,7 +24,6 @@ async function createSession(idToken: string) {
 
 export default function SignupForm() {
   const router = useRouter();
-  const [isNative, setIsNative] = useState(false);
   const [role, setRole] = useState<Role>("customer");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,12 +32,22 @@ export default function SignupForm() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const redirectHandled = useRef(false);
 
+  // On mount, pick up any pending signInWithRedirect result
   useEffect(() => {
-    import("@capacitor/core").then(({ Capacitor }) => {
-      setIsNative(Capacitor.isNativePlatform());
-    }).catch(() => {});
-  }, []);
+    if (redirectHandled.current || !isFirebaseConfigured) return;
+    redirectHandled.current = true;
+    void getRedirectResult(firebaseAuth).then(async (result) => {
+      if (result?.user) {
+        try {
+          await finishSignup(await result.user.getIdToken());
+        } catch {
+          setError("تعذّر إكمال التسجيل بعد إعادة التوجيه.");
+        }
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const roleLabel = useMemo(
     () =>
@@ -109,6 +118,8 @@ export default function SignupForm() {
     if (role === "vendor_staff" && !vendorName.trim()) { setError("أدخل اسم المتجر."); return; }
 
     setLoading(true);
+    clearFirebaseRedirectState();
+
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       await finishSignup(await result.user.getIdToken());
@@ -117,7 +128,11 @@ export default function SignupForm() {
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // user cancelled
       } else if (code === "auth/popup-blocked") {
-        setError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.");
+        try {
+          await signInWithRedirect(firebaseAuth, googleProvider);
+        } catch {
+          setError("المتصفح منع تسجيل الدخول. حاول مرة أخرى أو استخدم البريد الإلكتروني.");
+        }
       } else {
         setError(`خطأ Google: ${code || (err instanceof Error ? err.message : "غير معروف")}`);
       }
@@ -203,17 +218,15 @@ export default function SignupForm() {
           </button>
         </form>
 
-        {!isNative && (
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={loading || !isFirebaseConfigured}
-            className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-          >
-            <GoogleIcon />
-            {loading ? "جارٍ…" : "التسجيل مع Google"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading || !isFirebaseConfigured}
+          className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          <GoogleIcon />
+          {loading ? "جارٍ…" : "التسجيل مع Google"}
+        </button>
 
         <p className="mt-6 text-center text-xs text-neutral-500">
           لديك حساب؟{" "}
