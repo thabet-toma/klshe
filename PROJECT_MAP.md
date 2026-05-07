@@ -126,6 +126,15 @@ tests/
 
 ## Issues Fixed in This PR
 
+### 0. Google Login: "missing initial state" Error on Mobile
+- **Problem**: On mobile, `signInWithPopup` fails when the browser blocks popups. Firebase SDK leaves stale redirect state in `sessionStorage`. On next page load, Firebase tries to process the stale state and throws `"Unable to process request due to missing initial state"`. The user sees a white page and then this error on refresh.
+- **Fix**: 
+  - Added `clearFirebaseRedirectState()` in `firebase/config.ts` that scrubs all Firebase-related keys from `sessionStorage` (not just `firebase:pendingRedirect:`)
+  - Called it before every Google sign-in attempt
+  - Added `useEffect` in both forms that calls `getRedirectResult()` on mount to complete any pending `signInWithRedirect` flow
+  - When `signInWithPopup` fails with `auth/popup-blocked`, falls back to `signInWithRedirect` which redirects the page to Google — when the user comes back, the `useEffect` picks up the result and completes the login
+- **Files**: `lib/firebase/config.ts`, `app/components/auth/LoginForm.tsx`, `app/components/auth/SignupForm.tsx`
+
 ### 1. Google Login Hidden (LoginForm + SignupForm)
 - **Problem**: Google sign-in buttons were wrapped in `{!isNative && (...)}` conditionals that hid them on Capacitor native platforms. The `useEffect` detection was unreliable and the native check prevented Google sign-in on all platforms where Capacitor was detected.
 - **Fix**: Removed `isNative` conditionals. Google buttons now show on all platforms. Popup errors on native are handled gracefully with user-visible messages. Removed unused `useEffect` and `isNative` state.

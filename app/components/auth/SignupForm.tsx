@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
+import { createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } from "firebase/auth";
+import { firebaseAuth, isFirebaseConfigured, clearFirebaseRedirectState } from "@/lib/firebase/config";
 import { BRAND_NAME } from "@/lib/brand";
 
 const googleProvider = new GoogleAuthProvider();
@@ -32,6 +32,22 @@ export default function SignupForm() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const redirectHandled = useRef(false);
+
+  // On mount, pick up any pending signInWithRedirect result
+  useEffect(() => {
+    if (redirectHandled.current || !isFirebaseConfigured) return;
+    redirectHandled.current = true;
+    void getRedirectResult(firebaseAuth).then(async (result) => {
+      if (result?.user) {
+        try {
+          await finishSignup(await result.user.getIdToken());
+        } catch {
+          setError("تعذّر إكمال التسجيل بعد إعادة التوجيه.");
+        }
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const roleLabel = useMemo(
     () =>
@@ -102,6 +118,8 @@ export default function SignupForm() {
     if (role === "vendor_staff" && !vendorName.trim()) { setError("أدخل اسم المتجر."); return; }
 
     setLoading(true);
+    clearFirebaseRedirectState();
+
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       await finishSignup(await result.user.getIdToken());
@@ -110,7 +128,11 @@ export default function SignupForm() {
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // user cancelled
       } else if (code === "auth/popup-blocked") {
-        setError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.");
+        try {
+          await signInWithRedirect(firebaseAuth, googleProvider);
+        } catch {
+          setError("المتصفح منع تسجيل الدخول. حاول مرة أخرى أو استخدم البريد الإلكتروني.");
+        }
       } else {
         setError(`خطأ Google: ${code || (err instanceof Error ? err.message : "غير معروف")}`);
       }

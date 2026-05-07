@@ -17,16 +17,20 @@ export const firebaseAuth = getAuth(app);
 // "missing initial state" errors in WebViews and partitioned storage environments.
 if (typeof window !== "undefined") {
   void setPersistence(firebaseAuth, browserLocalPersistence);
-  // Clear stale redirect state left by previous signInWithRedirect attempts
+  clearFirebaseRedirectState();
+}
+
+/** Scrub any stale Firebase redirect state from sessionStorage. */
+export function clearFirebaseRedirectState(): void {
   try {
     for (let i = sessionStorage.length - 1; i >= 0; i--) {
       const key = sessionStorage.key(i);
-      if (key?.startsWith("firebase:pendingRedirect:")) {
+      if (key && (key.startsWith("firebase:") || key.startsWith("auth/") || key.startsWith("redirect:"))) {
         sessionStorage.removeItem(key);
       }
     }
   } catch {
-    // sessionStorage inaccessible — fine, nothing to clear
+    // sessionStorage inaccessible
   }
 }
 

@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
+import { firebaseAuth, isFirebaseConfigured, clearFirebaseRedirectState } from "@/lib/firebase/config";
 import { BRAND_NAME } from "@/lib/brand";
 
 const googleProvider = new GoogleAuthProvider();
@@ -39,6 +41,22 @@ export default function LoginForm({
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const redirectHandled = useRef(false);
+
+  // On mount, pick up any pending signInWithRedirect result
+  useEffect(() => {
+    if (redirectHandled.current || !isFirebaseConfigured) return;
+    redirectHandled.current = true;
+    void getRedirectResult(firebaseAuth).then(async (result) => {
+      if (result?.user) {
+        try {
+          await finishLogin(await result.user.getIdToken());
+        } catch {
+          setLocalError("تعذّر إكمال تسجيل الدخول بعد إعادة التوجيه.");
+        }
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const errorMessage = useMemo(() => {
     if (errorCode === "forbidden") return "هذا الحساب ليس ضمن مديري المنصة.";
@@ -102,6 +120,9 @@ export default function LoginForm({
     if (!isFirebaseConfigured) { setLocalError("لم يُضبط Firebase في البيئة."); return; }
 
     setLoading(true);
+    // Clear stale redirect state before attempting sign-in
+    clearFirebaseRedirectState();
+
     try {
       const result = await signInWithPopup(firebaseAuth, googleProvider);
       await finishLogin(await result.user.getIdToken());
@@ -110,7 +131,13 @@ export default function LoginForm({
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         // user cancelled — don't show error
       } else if (code === "auth/popup-blocked") {
-        setLocalError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.");
+        // Popup blocked on mobile — fall back to redirect
+        try {
+          await signInWithRedirect(firebaseAuth, googleProvider);
+          // The page will redirect away — no further action needed
+        } catch {
+          setLocalError("المتصفح منع تسجيل الدخول. حاول مرة أخرى أو استخدم البريد الإلكتروني.");
+        }
       } else if (code === "auth/unauthorized-domain") {
         setLocalError("هذا النطاق غير مصرّح في Firebase. أضف النطاق في Firebase Console → Authentication → Settings → Authorized domains.");
       } else {
