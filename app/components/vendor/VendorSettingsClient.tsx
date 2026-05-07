@@ -311,6 +311,7 @@ export default function VendorSettingsClient() {
 
     {/* Request to add a new store */}
     <RequestNewStoreSection />
+    </div>
   );
 }
 
