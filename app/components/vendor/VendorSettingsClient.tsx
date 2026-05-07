@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { agorotToShekel } from "@/lib/currency/agorot";
 import { useVendorWorkspace } from "./VendorWorkspace";
 
@@ -144,12 +145,21 @@ export default function VendorSettingsClient() {
   if (ctxLoading || loading) {
     return <div className="rounded-3xl bg-white p-8 text-sm text-neutral-500 ring-1 ring-black/5">جارٍ التحميل…</div>;
   }
+
   if (error || !activeVendorId || !profile) {
-    return <div className="rounded-3xl bg-white p-8 text-sm text-neutral-600 ring-1 ring-black/5">تعذر تحميل إعدادات المتجر.</div>;
+    return (
+      <div className="space-y-4">
+        <div className="rounded-3xl bg-white p-8 text-sm text-neutral-600 ring-1 ring-black/5">
+          لا يوجد متجر نشط. يمكنك طلب إضافة متجر جديد بالأسفل.
+        </div>
+        <RequestNewStoreSection />
+      </div>
+    );
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 rounded-3xl bg-white p-5 shadow-soft ring-1 ring-black/5">
+    <div className="space-y-4">
+      <form onSubmit={(e) => void onSubmit(e)} className="space-y-4 rounded-3xl bg-white p-5 shadow-soft ring-1 ring-black/5">
       {msg && <p className="rounded-xl bg-neutral-100 px-3 py-2 text-sm text-neutral-700">{msg}</p>}
       <Field label="اسم المتجر">
         <input className="input" value={profile.name} onChange={(e) => setProfile((s) => (s ? { ...s, name: e.target.value } : s))} />
@@ -298,6 +308,119 @@ export default function VendorSettingsClient() {
       </button>
       <style>{`.input{display:block;width:100%;border-radius:1rem;background:#fff;padding:0.7rem 0.9rem;font-size:.9rem;box-shadow:0 0 0 1px rgba(0,0,0,.08);outline:none}.input:focus{box-shadow:0 0 0 2px rgba(16,185,129,.35)}`}</style>
     </form>
+
+    {/* Request to add a new store */}
+    <RequestNewStoreSection />
+  );
+}
+
+function RequestNewStoreSection() {
+  const { vendors } = useVendorWorkspace();
+  const [showForm, setShowForm] = useState(false);
+  const [vendorName, setVendorName] = useState("");
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!vendorName.trim()) return;
+    setSending(true);
+    setResult(null);
+    try {
+      const r = await fetch("/api/onboarding-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestedRole: "vendor_staff",
+          fullName: null,
+          phone: null,
+          vendorName: vendorName.trim(),
+          note: note.trim() || null,
+        }),
+      });
+      const d = (await r.json()) as { error?: string };
+      if (!r.ok) throw new Error(d.error ?? "فشل الإرسال.");
+      setResult("تم إرسال طلبك. سيراجعه المدير ويُفعّل المتجر عند الموافقة.");
+      setVendorName("");
+      setNote("");
+      setShowForm(false);
+    } catch (e) {
+      setResult(e instanceof Error ? e.message : "خطأ غير معروف.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-black/5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-extrabold text-neutral-900">طلب إضافة متجر جديد</p>
+          <p className="text-[12px] text-neutral-500">
+            {vendors.length === 0
+              ? "لا تملك أي متجر بعد. أرسل طلباً لإضافة متجرك إلى المنصة."
+              : "يمكنك طلب إضافة متجر آخر إلى حسابك."}
+          </p>
+        </div>
+        {!showForm && (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-xs font-extrabold text-white hover:bg-emerald-700 shrink-0"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.6} />
+            طلب متجر
+          </button>
+        )}
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3 border-t border-black/5 pt-4">
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-neutral-600">اسم المتجر *</span>
+            <input
+              value={vendorName}
+              onChange={(e) => setVendorName(e.target.value)}
+              required
+              className="input"
+              placeholder="مثال: متجر العطارة"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-bold text-neutral-600">ملاحظة (اختياري)</span>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              className="input"
+              rows={2}
+              placeholder="أي معلومات إضافية للمدير..."
+            />
+          </label>
+          {result && (
+            <p className={`rounded-xl px-3 py-2 text-sm ${result.includes("تم") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"}`}>
+              {result}
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={sending || !vendorName.trim()}
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-extrabold text-white disabled:opacity-50"
+            >
+              {sending ? "جارٍ الإرسال..." : "إرسال الطلب"}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowForm(false); setResult(null); }}
+              className="rounded-xl border border-black/10 bg-white px-4 py-2 text-xs font-bold text-neutral-700"
+            >
+              إلغاء
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
   );
 }
 

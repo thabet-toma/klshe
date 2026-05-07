@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
@@ -24,7 +24,6 @@ async function createSession(idToken: string) {
 
 export default function SignupForm() {
   const router = useRouter();
-  const [isNative, setIsNative] = useState(false);
   const [role, setRole] = useState<Role>("customer");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,12 +32,6 @@ export default function SignupForm() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    import("@capacitor/core").then(({ Capacitor }) => {
-      setIsNative(Capacitor.isNativePlatform());
-    }).catch(() => {});
-  }, []);
 
   const roleLabel = useMemo(
     () =>
@@ -203,17 +196,15 @@ export default function SignupForm() {
           </button>
         </form>
 
-        {!isNative && (
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={loading || !isFirebaseConfigured}
-            className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-          >
-            <GoogleIcon />
-            {loading ? "جارٍ…" : "التسجيل مع Google"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading || !isFirebaseConfigured}
+          className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          <GoogleIcon />
+          {loading ? "جارٍ…" : "التسجيل مع Google"}
+        </button>
 
         <p className="mt-6 text-center text-xs text-neutral-500">
           لديك حساب؟{" "}
