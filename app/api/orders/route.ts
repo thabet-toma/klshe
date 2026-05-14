@@ -199,7 +199,8 @@ export async function POST(request: Request) {
     }
   }
 
-  const { data: createdOrder, error: orderError } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: createdOrder, error: orderError } = await (supabase as any)
     .from("orders")
     .insert({
       short_code: shortCode,
