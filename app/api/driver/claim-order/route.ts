@@ -51,7 +51,8 @@ export async function POST(request: Request) {
   const supabase = createServerSupabase();
   
   // Use a transaction to safely claim the order
-  const { data, error } = await supabase.rpc('claim_order', {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('claim_order', {
     p_order_id: orderId,
     p_driver_id: driverRow.id
   });
