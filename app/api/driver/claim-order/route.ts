@@ -23,7 +23,7 @@ export async function POST(request: Request) {
   // Verify the user is an active driver
   const { data: driverRow } = await routeSb
     .from("delivery_drivers")
-    .select("id, is_active")
+    .select("id, status")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "حسابك ليس سائقاً معتمداً." }, { status: 403 });
   }
 
-  if (!driverRow.is_active) {
+  if (driverRow.status === "offline") {
     return NextResponse.json({ error: "حساب السائق غير نشط." }, { status: 403 });
   }
 
