@@ -6,6 +6,7 @@ import { sendOrderStatusPush } from "@/lib/push/web-push";
 
 const ALLOWED_STATUSES = new Set([
   "new",
+  "broadcast",
   "accepted",
   "preparing",
   "ready",
@@ -66,6 +67,9 @@ export async function GET(request: Request) {
       cancellation_reason,
       vendor_id,
       driver_id,
+      broadcast_at,
+      claimed_at,
+      claimed_by,
       vendors (
         id,
         name,

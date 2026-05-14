@@ -20,12 +20,16 @@ type OrderRow = {
   created_at: string;
   cancellation_reason: string | null;
   driver_id: string | null;
+  broadcast_at: string | null;
+  claimed_at: string | null;
+  claimed_by: string | null;
   vendors?: { id: string; name: string; slug: string } | null;
   order_items: { id: number; product_name: string; quantity: number; line_total: number }[];
 };
 
 const statusLabels: Record<string, string> = {
   new: "جديد",
+  broadcast: "مبثّ",
   accepted: "مقبول",
   preparing: "تحضير",
   ready: "جاهز",
@@ -239,22 +243,36 @@ export default function OrdersBoard() {
                 </button>
               ))}
             </div>
-            <div className="mt-3 rounded-xl bg-neutral-50 p-3">
-              <p className="mb-2 text-xs font-bold text-neutral-600">تعيين سائق</p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {drivers.map((d) => (
-                  <button key={d.id} type="button" disabled={saving} onClick={() => void patchOrder({ orderId: focused.id, driverId: d.id, status: "dispatched" })} className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ring-1 ${focused.driver_id === d.id ? "bg-brand-50 ring-brand-200" : "bg-white ring-black/5"}`}>
-                    <span>{d.name}</span>
-                    {focused.driver_id === d.id ? <UserCheck className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+            {focused.status !== 'broadcast' && (
+              <div className="mt-3 rounded-xl bg-neutral-50 p-3">
+                <p className="mb-2 text-xs font-bold text-neutral-600">تعيين سائق</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {drivers.map((d) => (
+                    <button key={d.id} type="button" disabled={saving} onClick={() => void patchOrder({ orderId: focused.id, driverId: d.id, status: "dispatched" })} className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold ring-1 ${focused.driver_id === d.id ? "bg-brand-50 ring-brand-200" : "bg-white ring-black/5"}`}>
+                      <span>{d.name}</span>
+                      {focused.driver_id === d.id ? <UserCheck className="h-4 w-4" /> : <Truck className="h-4 w-4" />}
+                    </button>
+                  ))}
+                </div>
+                {focused.driver_id && (
+                  <button type="button" disabled={saving} onClick={() => void patchOrder({ orderId: focused.id, driverId: null })} className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-bold ring-1 ring-black/10">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> إزالة التعيين
                   </button>
-                ))}
+                )}
               </div>
-              {focused.driver_id && (
-                <button type="button" disabled={saving} onClick={() => void patchOrder({ orderId: focused.id, driverId: null })} className="mt-2 inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs font-bold ring-1 ring-black/10">
-                  <CheckCircle2 className="h-3.5 w-3.5" /> إزالة التعيين
-                </button>
-              )}
-            </div>
+            )}
+            
+            {focused.status === 'broadcast' && (
+              <div className="mt-3 rounded-xl bg-emerald-50 p-3">
+                <p className="mb-2 text-xs font-bold text-emerald-600">نظام المطالبة</p>
+                <p className="text-xs text-neutral-600">هذا الطلب مبث للسائقين وسيتم مطالبته تلقائياً بواسطة أول سائق يقبل الطلب.</p>
+                {focused.claimed_by && focused.claimed_at ? (
+                  <div className="mt-2 text-xs text-emerald-700">
+                    تمت المطالبة بواسطة سائق بتاريخ {new Date(focused.claimed_at).toLocaleString("ar-IL")}
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
       )}

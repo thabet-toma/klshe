@@ -13,6 +13,7 @@ import {
 import { useOrders } from "@/lib/stores/orders-store";
 import { drivers, statusLabels, statusStyles } from "@/lib/mock";
 import { formatPrice } from "@/lib/data";
+import AvailableOrders from "./AvailableOrders";
 
 const me = drivers[0];
 const COMMISSION = 0.1;
@@ -91,13 +92,18 @@ export default function DriverHome() {
         </Link>
       </section>
 
+      {/* Available orders for claiming */}
+      <section className="mt-5">
+        <AvailableOrders />
+      </section>
+
       {/* Active tasks */}
       <section className="mt-5">
         <div className="mb-2 flex items-end justify-between">
           <div>
             <h2 className="text-base font-extrabold">المهام النشطة</h2>
             <p className="text-[12px] text-neutral-500">
-              طلبات معينة لك الآن
+              طلبات قمت بمطالبتها
             </p>
           </div>
           <Link
@@ -170,6 +176,11 @@ export default function DriverHome() {
             ))}
           </ul>
         )}
+      </section>
+      
+      {/* Available orders for claiming */}
+      <section className="mt-5">
+        <AvailableOrders />
       </section>
     </div>
   );

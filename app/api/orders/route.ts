@@ -213,10 +213,11 @@ export async function POST(request: Request) {
       total: totalAgorot,
       discount_amount: resolvedDiscountAmount,
       coupon_code: resolvedCouponCode,
-      status: "new",
+      status: "broadcast",
       payment_method: payload.paymentMethod,
       notes: payload.notes ?? null,
       vendor_id: resolvedVendorId,
+      broadcast_at: new Date().toISOString(),
       customer_id: customerId,
       address_id: resolvedAddressId,
     })
