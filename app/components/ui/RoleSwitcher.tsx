@@ -44,7 +44,7 @@ export default function RoleSwitcher({ roles }: { roles: CurrentUserRoles }) {
       color: "from-violet-500 to-indigo-500",
     });
   }
-  if (roles.isDriver) {
+  if (roles.isDriver || roles.isAdmin) {
     links.push({
       href: "/driver",
       label: "تطبيق السائق",

@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (isDriverPath && session && !isDriver) {
+  if (isDriverPath && session && !isDriver && !isPlatformAdmin) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.searchParams.set("error", "driver_forbidden");
@@ -56,7 +56,7 @@ export async function updateSession(request: NextRequest) {
         : "/admin";
     if (safeNext.startsWith("/admin") && !isPlatformAdmin) return NextResponse.next({ request });
     if (safeNext.startsWith("/vendor") && !hasVendorStaff) return NextResponse.next({ request });
-    if (safeNext.startsWith("/driver") && !isDriver) return NextResponse.next({ request });
+    if (safeNext.startsWith("/driver") && !isDriver && !isPlatformAdmin) return NextResponse.next({ request });
     return NextResponse.redirect(new URL(safeNext, request.url));
   }
 

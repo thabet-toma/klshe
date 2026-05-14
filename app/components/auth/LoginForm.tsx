@@ -28,10 +28,12 @@ async function createSession(idToken: string) {
 export default function LoginForm({
   nextPath,
   errorCode,
+  signupPending,
 }: {
   nextPath: string;
   supabaseConfigured?: boolean;
   errorCode?: string;
+  signupPending?: boolean;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"login" | "signup">("login");
@@ -141,6 +143,13 @@ export default function LoginForm({
           <p className="mt-4 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
             {localError ?? errorMessage}
           </p>
+        )}
+
+        {signupPending && (
+          <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            <p className="font-extrabold">طلبك قيد المراجعة ✓</p>
+            <p className="mt-1 text-blue-700">سيتحقق منه المشرف وسيتم تفعيل حسابك قريباً. يمكنك تسجيل الدخول الآن كزبون.</p>
+          </div>
         )}
 
         {!isFirebaseConfigured && (
