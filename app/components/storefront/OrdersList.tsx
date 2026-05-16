@@ -17,6 +17,7 @@ type OrderSummary = {
 
 export default function OrdersList() {
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -29,6 +30,8 @@ export default function OrdersList() {
         setOrders(json.orders);
       } catch {
         if (active) setOrders([]);
+      } finally {
+        if (active) setLoading(false);
       }
     }
     void pull();
@@ -49,6 +52,23 @@ export default function OrdersList() {
       active = false;
     };
   }, []);
+
+  if (loading) {
+    return (
+      <div className="mt-4 space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-black/5">
+            <div className="h-12 w-12 shrink-0 animate-pulse rounded-2xl bg-neutral-200" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-24 animate-pulse rounded bg-neutral-200" />
+              <div className="h-3 w-16 animate-pulse rounded bg-neutral-200" />
+              <div className="h-4 w-20 animate-pulse rounded bg-neutral-200" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   if (orders.length === 0) {
     return (

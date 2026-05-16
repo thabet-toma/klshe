@@ -38,6 +38,7 @@ export default function ProductCard({ product }: Props) {
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (pulse) return;
     add(product, 1);
     trackEvent("cart_add", {
       product_id: product.id,

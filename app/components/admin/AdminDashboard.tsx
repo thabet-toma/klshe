@@ -13,9 +13,11 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useOrders } from "@/lib/stores/orders-store";
-import { drivers } from "@/lib/mock";
 import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
+
+// TODO: استبدل ببيانات سائقين حقيقية من API (M4)
+const mockDrivers: { status: string }[] = [];
 
 export default function AdminDashboard() {
   const orders = useOrders((s) => s.orders);
@@ -28,7 +30,7 @@ export default function AdminDashboard() {
   );
   const completed = orders.filter((o) => o.status === "delivered");
   const revenue = completed.reduce((s, o) => s + o.total, 0);
-  const onlineDrivers = drivers.filter((d) => d.status === "online").length;
+  const onlineDrivers = mockDrivers.filter((d: { status: string }) => d.status === "online").length;
 
   const lowStock = 5; // placeholder
   const recent = [...orders].slice(0, 5);
@@ -55,7 +57,7 @@ export default function AdminDashboard() {
         />
         <KpiCard
           title="السائقون النشطون"
-          value={`${onlineDrivers}/${drivers.length}`}
+          value={`${onlineDrivers}/${mockDrivers.length}`}
           subtitle="متاحون الآن"
           icon={Truck}
           gradient="from-violet-500 to-indigo-500"

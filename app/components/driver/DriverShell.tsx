@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, Home, LogOut, Wallet } from "lucide-react";
-import { drivers } from "@/lib/mock";
 
 const items = [
   { href: "/driver", label: "الرئيسية", icon: Home },
@@ -12,7 +11,13 @@ const items = [
   { href: "/driver/settlement", label: "التقاص", icon: Wallet },
 ];
 
-const me = drivers[0];
+// TODO: replace with real driver data from session/API
+const me = {
+  id: "me",
+  name: "السائق",
+  avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&q=80&auto=format&fit=crop",
+  status: "online" as const,
+};
 
 export default function DriverShell({
   children,

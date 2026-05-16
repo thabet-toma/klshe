@@ -136,6 +136,15 @@ This document outlines the implementation of the new order assignment flow that 
 - [x] T2.6: CORS allowlist logged at startup; rate-limit added to `/api/driver/claim-order`, `/api/payments/stripe/create-session`, `/api/auth/session`
 - [x] T2.7: خصم مخزون **ذرّي** عبر `migration_025` RPC `decrement_inventory` (تحديث شرطي `stock >= qty` يمنع السالب/التسابق) — استُبدل منطق read-then-write
 
+## M3 Phase Status
+- [x] T3.1: OrdersList skeleton loading (3 بطاقات متحركة أثناء الجلب)
+- [x] T3.2: ProductCard منع نقر مزدوج (`if (pulse) return` في handleAdd)
+- [x] T3.3: product_name snapshot في order_items يحمي من حذف المنتج — OrderTrackingView reorder يستخدم `it.products?.unit/image ?? fallback`
+- [x] T3.4: formatPrice (lib/currency.ts) هو المصدر الوحيد لعرض الأسعار — لا حساب يدوي ÷100 في العرض
+- [x] T3.5: migration_022/023 وُسما بـ DEPRECATED header؛ مسار app/ خالٍ تماماً من استيراد lib/mock (AdminDashboard كان يستخدم `require()` — استُبدل بـ placeholder نظيف لإصلاح خطأ lint `no-require-imports`)
+
+> مراجعة M3: T3.2/T3.3 صحيحان كما نُفِّذا. T3.4 سليم للعرض (بقي تحويلان agorot→shekel في حقول إدخال فقط لا عرض). الإصلاح الوحيد: `require("@/lib/mock")` في AdminDashboard كسر lint → placeholder فارغ. typecheck + build نظيفان.
+
 ## Future Enhancements
 - Driver performance metrics from claim history
 - Automatic order timeout system

@@ -1,25 +1,20 @@
 "use client";
 
 import { Banknote, CheckCircle2, Receipt, Wallet } from "lucide-react";
-import { useOrders } from "@/lib/stores/orders-store";
-import { drivers } from "@/lib/mock";
 import { formatPrice } from "@/lib/data";
 
-const me = drivers[0];
+// TODO: replace with real driver data from API
+const me = { id: "me", name: "السائق", rating: 4.8 };
 const COMMISSION = 0.1;
 
 export default function DriverSettlement() {
-  const orders = useOrders((s) => s.orders);
-  const mineDelivered = orders.filter(
-    (o) => o.driverId === me.id && o.status === "delivered",
-  );
-  const collected = mineDelivered.reduce((s, o) => s + o.total, 0);
-  const commission = Math.round(collected * COMMISSION);
-  const netToStore = collected - commission;
-  const cashOnly = mineDelivered
-    .filter((o) => o.payment === "cash")
-    .reduce((s, o) => s + o.total, 0);
-  const cardOnly = collected - cashOnly;
+  // TODO: fetch real driver settlement data from API
+  const mineDelivered: { id: string; shortCode: string; payment: string; total: number; customer: { name: string } }[] = [];
+  const collected = 0;
+  const commission = 0;
+  const netToStore = 0;
+  const cashOnly = 0;
+  const cardOnly = 0;
 
   return (
     <div className="mx-auto w-full max-w-screen-md px-4">

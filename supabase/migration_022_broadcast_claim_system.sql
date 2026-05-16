@@ -1,3 +1,7 @@
+-- ⚠️ DEPRECATED: superseded by migration_024_broadcast_claim_fixed.sql
+-- هذا الترحيل مهجور. استخدم migration_024 بدلاً منه.
+-- لا تطبّق هذا الملف على قاعدة بيانات حيّة.
+
 -- Broadcast & Claim System Migration
 -- This migration updates the orders table to support the new broadcast and claim workflow
 -- where orders are broadcasted to all drivers and the first driver to claim an order gets it

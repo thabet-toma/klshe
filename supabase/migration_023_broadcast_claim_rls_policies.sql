@@ -1,3 +1,7 @@
+-- ⚠️ DEPRECATED: superseded by migration_024_broadcast_claim_fixed.sql
+-- هذا الترحيل مهجور. استخدم migration_024 بدلاً منه.
+-- لا تطبّق هذا الملف على قاعدة بيانات حيّة.
+
 -- RLS Policies for Broadcast & Claim System
 
 -- Create audit log table for tracking order claims (if not exists)
