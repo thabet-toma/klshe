@@ -107,6 +107,39 @@ export async function POST(request: Request) {
 
   // Log the successful claim
   log.info("order_claimed", { order_id: orderId, driver_id: driverRow.id });
+
+  // T4.2: compute & persist ETA (vendor → customer leg) at claim time.
+  // Haversine + urban average speed; Mapbox not configured in this env.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: o } = await (supabase as any)
+      .from("orders")
+      .select("location_lat, location_lng, vendor_id")
+      .eq("id", orderId)
+      .maybeSingle();
+    if (o?.location_lat != null && o?.location_lng != null && o?.vendor_id) {
+      const { data: v } = await supabase
+        .from("vendors")
+        .select("location_lat, location_lng")
+        .eq("id", o.vendor_id)
+        .maybeSingle();
+      if (v?.location_lat != null && v?.location_lng != null) {
+        const R = 6371;
+        const toRad = (d: number) => (d * Math.PI) / 180;
+        const dLat = toRad(o.location_lat - v.location_lat);
+        const dLon = toRad(o.location_lng - v.location_lng);
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.cos(toRad(v.location_lat)) * Math.cos(toRad(o.location_lat)) * Math.sin(dLon / 2) ** 2;
+        const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const etaMinutes = Math.max(5, Math.ceil((distKm / 30) * 60) + 5); // +5min pickup buffer
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("orders").update({ eta_minutes: etaMinutes }).eq("id", orderId);
+      }
+    }
+  } catch (etaErr) {
+    log.warn("eta_compute_failed", { order_id: orderId, error: String(etaErr) });
+  }
   
   // Send push notification about the order status change
   try {

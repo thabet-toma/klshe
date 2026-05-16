@@ -20,7 +20,8 @@ export async function GET(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
 
-  const { data: order, error } = await supabase
+  // location_lat/lng, eta_minutes, timeline timestamps not in generated types yet
+  const { data: order, error } = await (supabase as any)
     .from("orders")
     .select(
       `
@@ -38,6 +39,14 @@ export async function GET(
       created_at,
       vendor_id,
       driver_id,
+      location_lat,
+      location_lng,
+      eta_minutes,
+      accepted_at,
+      claimed_at,
+      ready_at,
+      picked_at,
+      delivered_at,
       order_items (
         id,
         product_id,
@@ -68,13 +77,16 @@ export async function GET(
     phone: string;
     avatar_url: string;
     vehicle: string;
+    current_lat: number | null;
+    current_lng: number | null;
   } | null = null;
 
   const driverId = typeof order.driver_id === "string" ? order.driver_id : "";
   if (driverId) {
-    const { data: dr } = await supabase
+    // current_lat/current_lng not in generated types yet
+    const { data: dr } = await (supabase as any)
       .from("delivery_drivers")
-      .select("id, name, phone, avatar_url, vehicle")
+      .select("id, name, phone, avatar_url, vehicle, current_lat, current_lng")
       .eq("id", driverId)
       .maybeSingle();
     driver = dr ?? null;

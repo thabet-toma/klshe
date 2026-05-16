@@ -29,6 +29,7 @@ type ApiOrder = {
   subtotal: number; delivery_fee: number; total: number; status: string; notes: string | null; created_at: string;
   vendor_id: string | null; cancellation_reason: string | null;
   driver_id: string | null;
+  location_lat: number | null; location_lng: number | null; eta_minutes: number | null;
   accepted_at: string | null; claimed_at: string | null; ready_at: string | null;
   picked_at: string | null; delivered_at: string | null;
   order_items: {
@@ -149,14 +150,21 @@ export default function OrderTrackingView({ orderId }: Props) {
     return () => { void sb.removeChannel(ch); };
   }, [order?.driver_id]);
 
-  // ETA recalculation whenever driver moves
+  // ETA: live haversine (driver → delivery point) when we have both coords,
+  // otherwise fall back to the server-computed eta_minutes saved at claim time.
   useEffect(() => {
-    if (driverLat == null || driverLng == null) { setEtaMinutes(null); return; }
-    const SPEED_KMH = 35;
-    // We don't have customer lat/lng in this component; estimate ~5 km as fallback
-    const distKm = 5;
-    setEtaMinutes(Math.ceil((distKm / SPEED_KMH) * 60));
-  }, [driverLat, driverLng]);
+    const destLat = order?.location_lat;
+    const destLng = order?.location_lng;
+    if (driverLat != null && driverLng != null && destLat != null && destLng != null) {
+      const SPEED_KMH = 30; // urban delivery average
+      const distKm = haversineKm(driverLat, driverLng, destLat, destLng);
+      setEtaMinutes(Math.max(1, Math.ceil((distKm / SPEED_KMH) * 60)));
+    } else if (order?.eta_minutes != null) {
+      setEtaMinutes(order.eta_minutes);
+    } else {
+      setEtaMinutes(null);
+    }
+  }, [driverLat, driverLng, order?.location_lat, order?.location_lng, order?.eta_minutes]);
 
   const model = useMemo(() => {
     if (!order) return null;
@@ -328,7 +336,12 @@ export default function OrderTrackingView({ orderId }: Props) {
       {(model.status === "dispatched" || model.status === "on_way") && driverLat != null && driverLng != null && (
         <section className="mt-4">
           <h2 className="mb-2 text-sm font-extrabold">موقع السائق الحيّ</h2>
-          <OrderMap driverLat={driverLat} driverLng={driverLng} />
+          <OrderMap
+            driverLat={driverLat}
+            driverLng={driverLng}
+            destinationLat={order?.location_lat ?? undefined}
+            destinationLng={order?.location_lng ?? undefined}
+          />
         </section>
       )}
 
