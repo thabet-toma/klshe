@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { formatPrice } from "@/lib/data";
 import AvailableOrders from "./AvailableOrders";
+import { useLocationTracker } from "@/lib/hooks/useLocationTracker";
 
 type OrderRow = {
   id: string;
@@ -28,6 +29,9 @@ export default function DriverHome() {
   const [activeOrders, setActiveOrders] = useState<OrderRow[]>([]);
   const [todayDelivered, setTodayDelivered] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Track and broadcast driver location every 15s when there are active orders
+  useLocationTracker(activeOrders.length > 0);
 
   useEffect(() => {
     let cancelled = false;

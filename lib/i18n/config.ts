@@ -1,12 +1,16 @@
+export const DEFAULT_LOCALE = "ar" as const;
 export const SUPPORTED_LOCALES = ["ar", "he", "en"] as const;
 export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
 
-export const DEFAULT_LOCALE: AppLocale = "ar";
-
-export function isSupportedLocale(value: string): value is AppLocale {
-  return (SUPPORTED_LOCALES as readonly string[]).includes(value);
+export function isSupportedLocale(locale: string): locale is AppLocale {
+  return SUPPORTED_LOCALES.includes(locale as AppLocale);
 }
 
-export function localeDir(locale: string): "rtl" | "ltr" {
-  return locale === "ar" || locale === "he" ? "rtl" : "ltr";
+export function localeDir(locale: AppLocale): "rtl" | "ltr" {
+  return locale === "en" ? "ltr" : "rtl";
 }
+
+export const locales = SUPPORTED_LOCALES;
+export type Locale = AppLocale;
+
+export const rtlLocales = new Set<AppLocale>(["ar", "he"]);

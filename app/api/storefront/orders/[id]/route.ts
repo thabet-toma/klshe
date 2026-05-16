@@ -34,6 +34,7 @@ export async function GET(
       total,
       status,
       notes,
+      cancellation_reason,
       created_at,
       vendor_id,
       driver_id,

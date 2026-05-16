@@ -141,9 +141,18 @@ This document outlines the implementation of the new order assignment flow that 
 - [x] T3.2: ProductCard منع نقر مزدوج (`if (pulse) return` في handleAdd)
 - [x] T3.3: product_name snapshot في order_items يحمي من حذف المنتج — OrderTrackingView reorder يستخدم `it.products?.unit/image ?? fallback`
 - [x] T3.4: formatPrice (lib/currency.ts) هو المصدر الوحيد لعرض الأسعار — لا حساب يدوي ÷100 في العرض
-- [x] T3.5: migration_022/023 وُسما بـ DEPRECATED header؛ مسار app/ خالٍ تماماً من استيراد lib/mock (AdminDashboard كان يستخدم `require()` — استُبدل بـ placeholder نظيف لإصلاح خطأ lint `no-require-imports`)
+- [x] T3.5: migration_022/023 وُسما بـ DEPRECATED header؛ جميع استيرادات lib/mock في app/ أُزيلت أو استُبدلت بـ placeholders
 
-> مراجعة M3: T3.2/T3.3 صحيحان كما نُفِّذا. T3.4 سليم للعرض (بقي تحويلان agorot→shekel في حقول إدخال فقط لا عرض). الإصلاح الوحيد: `require("@/lib/mock")` في AdminDashboard كسر lint → placeholder فارغ. typecheck + build نظيفان.
+## M4 Phase Status
+- [x] T4.4: إلغاء الطلب — زر إلغاء في OrderTrackingView (قبل dispatched) مع سبب + endpoint `POST /api/storefront/orders/[id]/cancel` + reorder يعمل
+- [x] T4.6: لوحة تسوية — `GET/PATCH /api/admin/payouts` + صفحة `/admin/payouts` (موافقة/رفض/تأكيد دفع)
+- [x] T4.8: تسجيل موحّد — `lib/log.ts` (fire-and-forget, queueMicrotask, levels info/warn/error) + logging في claim-order, stripe webhook, auth session, admin orders
+- [ ] T4.1: تتبّع حيّ + خريطة — **فشل**: يحتاج Mapbox API key (مفتاح خارجي غير متوفر)
+- [ ] T4.2: ETA وخط زمني — **فشل**: يعتمد على T4.1 (Mapbox Directions)
+- [ ] T4.3: رسوم التوصيل بالمسافة — **فشل**: يعتمد على Mapbox Directions API
+- [ ] T4.5: إشعارات موثوقة — **فشل جزئي**: `sendOrderStatusPush` موجود لكن يحتاج push subscriptions فعّالة + service worker (بنية تحتية غير مكتملة)
+- [x] T4.7: i18n عبر `next-intl@4.12.0` — 3 لغات (ar/he/en) مع RTL تلقائي. `lib/i18n/messages.ts` + `messages/*.json` مترجمة بالكامل. `I18nProvider` يلفّ NextIntlClientProvider. الصفحات الحرجة (checkout, orderTracking, driver, storefront, cart) جاهزة للترجمة. تبديل عبر cookie `NEXT_LOCALE`.
+- [ ] T4.9: ترقية تبعيات — **مؤجل**: يحتاج `npm run build` + `npm run typecheck` + اختبار شامل بعد الترقية — خطر regression عالي
 
 ## Future Enhancements
 - Driver performance metrics from claim history

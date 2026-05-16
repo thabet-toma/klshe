@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
+import { NextIntlClientProvider } from "next-intl";
 import type { AppLocale } from "@/lib/i18n/config";
 import type { Messages } from "@/lib/i18n/messages";
 
@@ -22,7 +23,9 @@ export function I18nProvider({
 }) {
   return (
     <I18nContext.Provider value={{ locale, messages }}>
-      {children}
+      <NextIntlClientProvider locale={locale} messages={messages as Record<string, unknown>}>
+        {children}
+      </NextIntlClientProvider>
     </I18nContext.Provider>
   );
 }

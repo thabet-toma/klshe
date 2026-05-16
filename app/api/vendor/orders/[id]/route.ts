@@ -6,6 +6,8 @@ import {
   skipVendorAuthBecauseDemo,
 } from "@/lib/auth/require-vendor-staff";
 import type { Database } from "@/lib/supabase/types";
+import { sendOrderStatusPush } from "@/lib/push/web-push";
+import { log } from "@/lib/log";
 
 type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 type OrderUpdate = Database["public"]["Tables"]["orders"]["Update"];
@@ -160,6 +162,11 @@ export async function PATCH(
 
   if (upErr) {
     return NextResponse.json({ error: upErr.message }, { status: 500 });
+  }
+
+  if (updated && patch.status) {
+    await sendOrderStatusPush(updated.id, patch.status);
+    log.info("vendor_order_action", { order_id: updated.id, action, status: patch.status });
   }
 
   return NextResponse.json({ order: updated });

@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { getAdminAuth, isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { log } from "@/lib/log";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
     email = decoded.email;
     displayName = decoded.name;
   } catch {
+    log.warn("auth_invalid_token", { ip: request.headers.get("x-forwarded-for") ?? "unknown" });
     return NextResponse.json({ error: "رمز Firebase غير صالح." }, { status: 401 });
   }
 
@@ -95,6 +97,8 @@ export async function POST(request: Request) {
   cookieStore.set("fb_profile_id", profileId, cookieOpts);
   cookieStore.set("fb_role", role, cookieOpts);
   if (email) cookieStore.set("fb_email", email, cookieOpts);
+
+  log.info("auth_session_created", { profile_id: profileId, role });
 
   return NextResponse.json({ ok: true, role });
 }

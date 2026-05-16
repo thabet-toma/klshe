@@ -3,6 +3,7 @@ import { assertAdminApi } from "@/lib/auth/require-platform-admin";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import { sendOrderStatusPush } from "@/lib/push/web-push";
+import { log } from "@/lib/log";
 
 const ALLOWED_STATUSES = new Set([
   "new",
@@ -218,6 +219,7 @@ export async function PATCH(request: Request) {
 
   if (typeof patch.status === "string") {
     await sendOrderStatusPush(data.id, patch.status);
+    log.info("admin_order_status_change", { order_id: data.id, new_status: patch.status, driver_id: patch.driver_id });
   }
 
   return NextResponse.json({ order: data });

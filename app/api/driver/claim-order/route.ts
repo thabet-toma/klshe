@@ -3,6 +3,7 @@ import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
 import { sendOrderStatusPush } from "@/lib/push/web-push";
 import { checkRateLimit } from "@/lib/security/rate-limit";
+import { log } from "@/lib/log";
 
 export async function POST(request: Request) {
   const ip = request.headers.get("x-forwarded-for") ?? "unknown";
@@ -105,7 +106,7 @@ export async function POST(request: Request) {
   }
 
   // Log the successful claim
-  console.log(`Order ${orderId} successfully claimed by driver ${driverRow.id}`);
+  log.info("order_claimed", { order_id: orderId, driver_id: driverRow.id });
   
   // Send push notification about the order status change
   try {

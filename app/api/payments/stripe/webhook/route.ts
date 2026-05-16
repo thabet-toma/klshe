@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getStripeClient } from "@/lib/payments/stripe";
+import { log } from "@/lib/log";
 
 export async function POST(request: Request) {
   const stripe = getStripeClient();
@@ -23,6 +24,7 @@ export async function POST(request: Request) {
 
   // (a) Reject stale events (> 5 minutes old)
   if (Date.now() / 1000 - event.created > 300) {
+    log.warn("stripe_webhook_stale_event", { event_id: event.id, type: event.type, created: event.created });
     return NextResponse.json({ error: "Event too old." }, { status: 400 });
   }
 
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
 
       if (existingTx) {
         // Already processed — return 200 to avoid Stripe retries
+        log.info("stripe_webhook_dedup", { order_id: orderId, session_id: stripeSessionId });
         return NextResponse.json({ received: true, deduplicated: true });
       }
 
@@ -64,6 +67,7 @@ export async function POST(request: Request) {
           stripe_session_id: stripeSessionId,
           note: `Stripe paid session: ${session.id}`,
         });
+        log.info("stripe_payment_confirmed", { order_id: order.id, amount: order.total, session_id: stripeSessionId });
       }
     }
   }
