@@ -72,6 +72,7 @@ export type Database = {
           today_orders: number;
           earnings_today: number;
           user_id: string | null;
+          vendor_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -85,6 +86,7 @@ export type Database = {
           today_orders?: number;
           earnings_today?: number;
           user_id?: string | null;
+          vendor_id?: string | null;
           created_at?: string;
         };
         Update: Partial<
@@ -95,6 +97,12 @@ export type Database = {
             foreignKeyName: "delivery_drivers_user_id_fkey";
             columns: ["user_id"];
             referencedRelation: "users";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "delivery_drivers_vendor_id_fkey";
+            columns: ["vendor_id"];
+            referencedRelation: "vendors";
             referencedColumns: ["id"];
           },
         ];
@@ -231,6 +239,10 @@ export type Database = {
           picked_at: string | null;
           delivered_at: string | null;
           cancellation_reason: string | null;
+          broadcast_at: string | null;
+          claimed_at: string | null;
+          claimed_by: string | null;
+          prep_status: string;
         };
         Insert: {
           id?: string;
@@ -259,6 +271,10 @@ export type Database = {
           picked_at?: string | null;
           delivered_at?: string | null;
           cancellation_reason?: string | null;
+          broadcast_at?: string | null;
+          claimed_at?: string | null;
+          claimed_by?: string | null;
+          prep_status?: string;
         };
         Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
         Relationships: [
@@ -316,6 +332,7 @@ export type Database = {
           payment_method: "cash" | "card";
           note: string | null;
           vendor_id: string | null;
+          stripe_session_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -326,6 +343,7 @@ export type Database = {
           payment_method: "cash" | "card";
           note?: string | null;
           vendor_id?: string | null;
+          stripe_session_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;

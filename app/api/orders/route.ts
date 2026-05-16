@@ -199,8 +199,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: createdOrder, error: orderError } = await (supabase as any)
+  const { data: createdOrder, error: orderError } = await supabase
     .from("orders")
     .insert({
       short_code: shortCode,
@@ -219,6 +218,8 @@ export async function POST(request: Request) {
       notes: payload.notes ?? null,
       vendor_id: resolvedVendorId,
       broadcast_at: new Date().toISOString(),
+      accepted_at: new Date().toISOString(),
+      prep_status: "pending",
       customer_id: customerId,
       address_id: resolvedAddressId,
     })

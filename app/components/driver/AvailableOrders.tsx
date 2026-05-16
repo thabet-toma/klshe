@@ -89,7 +89,7 @@ export default function AvailableOrders() {
     
     const supabase = createBrowserSupabase();
     const channel = supabase
-      .channel("available-orders")
+      .channel("available-orders-" + crypto.randomUUID())
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "orders" },

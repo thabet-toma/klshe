@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   Banknote,
   CheckCircle2,
@@ -10,25 +11,59 @@ import {
   Star,
   Wallet,
 } from "lucide-react";
-import { useOrders } from "@/lib/stores/orders-store";
-import { drivers, statusLabels, statusStyles } from "@/lib/mock";
 import { formatPrice } from "@/lib/data";
 import AvailableOrders from "./AvailableOrders";
 
-const me = drivers[0];
-const COMMISSION = 0.1;
+type OrderRow = {
+  id: string;
+  short_code: string;
+  customer_name: string;
+  customer_address: string;
+  total: number;
+  status: string;
+  payment_method: string;
+};
 
 export default function DriverHome() {
-  const orders = useOrders((s) => s.orders);
+  const [activeOrders, setActiveOrders] = useState<OrderRow[]>([]);
+  const [todayDelivered, setTodayDelivered] = useState<OrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const myOrders = orders.filter((o) => o.driverId === me.id);
-  const active = myOrders.filter((o) =>
-    ["dispatched", "on_way"].includes(o.status),
-  );
-  const todayDelivered = myOrders.filter((o) => o.status === "delivered");
+  useEffect(() => {
+    let cancelled = false;
+    const fetchOrders = async () => {
+      try {
+        const res = await fetch("/api/driver/orders");
+        if (!res.ok) { setActiveOrders([]); setTodayDelivered([]); return; }
+        const json = await res.json();
+        if (!cancelled) {
+          const all: OrderRow[] = json.orders ?? [];
+          setActiveOrders(all.filter((o) => ["dispatched", "on_way"].includes(o.status)));
+          setTodayDelivered(all.filter((o) => o.status === "delivered"));
+        }
+      } catch {
+        if (!cancelled) { setActiveOrders([]); setTodayDelivered([]); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchOrders();
+    return () => { cancelled = true; };
+  }, []);
+
   const collected = todayDelivered.reduce((s, o) => s + o.total, 0);
-  const commission = Math.round(collected * COMMISSION);
+  const commission = Math.round(collected * 0.1);
   const netToStore = collected - commission;
+
+  if (loading) {
+    return (
+      <div className="mx-auto w-full max-w-screen-md px-4">
+        <div className="flex h-40 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-screen-md px-4">
@@ -36,19 +71,19 @@ export default function DriverHome() {
       <div className="grid grid-cols-3 gap-2 rounded-3xl bg-white p-3 shadow-card ring-1 ring-black/5">
         <Stat
           label="مهام اليوم"
-          value={myOrders.length}
+          value={activeOrders.length}
           icon={CheckCircle2}
           color="text-emerald-600"
         />
         <Stat
           label="نشطة الآن"
-          value={active.length}
+          value={activeOrders.length}
           icon={Clock}
           color="text-amber-600"
         />
         <Stat
           label="تقييمي"
-          value={me.rating.toString()}
+          value="4.8"
           icon={Star}
           color="text-orange-500"
         />
@@ -71,7 +106,7 @@ export default function DriverHome() {
             </dd>
           </div>
           <div className="flex items-center justify-between">
-            <dt className="text-white/85">عمولتي ({COMMISSION * 100}%)</dt>
+            <dt className="text-white/85">عمولتي (10%)</dt>
             <dd className="font-extrabold">
               {formatPrice(commission)}
             </dd>
@@ -114,19 +149,19 @@ export default function DriverHome() {
           </Link>
         </div>
 
-        {active.length === 0 ? (
+        {activeOrders.length === 0 ? (
           <div className="rounded-2xl bg-white p-8 text-center shadow-soft ring-1 ring-black/5">
             <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-3xl bg-emerald-50 text-emerald-500">
               <CheckCircle2 className="h-7 w-7" strokeWidth={1.8} />
             </span>
             <p className="mt-3 text-sm font-extrabold">لا توجد مهام نشطة</p>
             <p className="mt-1 text-[12px] text-neutral-500">
-              ستظهر الطلبات هنا فور تعيينها لك
+              اطّلب من قائمة الطلبات المتاحة أدناه
             </p>
           </div>
         ) : (
           <ul className="space-y-3">
-            {active.map((o) => (
+            {activeOrders.map((o) => (
               <li key={o.id}>
                 <Link
                   href={`/driver/orders/${o.id}`}
@@ -134,30 +169,32 @@ export default function DriverHome() {
                 >
                   <div className="flex items-center gap-3">
                     <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-gradient bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-extrabold text-white shadow-pop">
-                      {o.shortCode.replace("#", "")}
+                      {o.short_code.replace("#", "")}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-extrabold">
-                        {o.customer.name}
+                        {o.customer_name}
                       </p>
                       <p className="flex items-center gap-1 truncate text-[12px] text-neutral-500">
                         <MapPin className="h-3.5 w-3.5" strokeWidth={2.4} />
-                        {o.customer.address}
+                        {o.customer_address}
                       </p>
                     </div>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ring-1 ${
-                        statusStyles[o.status]
+                        o.status === "dispatched"
+                          ? "bg-blue-50 text-blue-700 ring-blue-200"
+                          : "bg-amber-50 text-amber-700 ring-amber-200"
                       }`}
                     >
-                      {statusLabels[o.status]}
+                      {o.status === "dispatched" ? "مُرسَل" : "في الطريق"}
                     </span>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between border-t border-dashed border-neutral-200 pt-3">
                     <span className="inline-flex items-center gap-1 text-[12px] font-bold text-neutral-600">
                       <Banknote className="h-4 w-4" strokeWidth={2.2} />
-                      {o.payment === "cash" ? "نقدي" : "بطاقة"}
+                      {o.payment_method === "cash" ? "نقدي" : "بطاقة"}
                     </span>
                     <span className="text-base font-extrabold text-emerald-700">
                       {formatPrice(o.total)}
@@ -176,11 +213,6 @@ export default function DriverHome() {
             ))}
           </ul>
         )}
-      </section>
-      
-      {/* Available orders for claiming */}
-      <section className="mt-5">
-        <AvailableOrders />
       </section>
     </div>
   );

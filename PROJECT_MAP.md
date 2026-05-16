@@ -19,23 +19,30 @@ This document outlines the implementation of the new order assignment flow that 
 ### New Fields in orders table
 - `broadcast_at` (timestamptz): Timestamp when the order was broadcasted to drivers
 - `claimed_at` (timestamptz): Timestamp when order was claimed by a driver
-- `claimed_by` (uuid): Reference to the driver who claimed the order (delivery_drivers.id)
+- `claimed_by` (text): Reference to the driver who claimed the order (delivery_drivers.id)
+- `prep_status` (text): Preparation status — pending | preparing | ready
+- `accepted_at` (timestamptz): When the order was accepted
+- `ready_at` (timestamptz): When preparation was completed
+- `picked_at` (timestamptz): When the driver picked up the order
+- `delivered_at` (timestamptz): When the order was delivered
+- `cancellation_reason` (text): Reason for cancellation
+- `eta_minutes` (integer): Estimated time of arrival in minutes
 
 ### New Status
 - Added `broadcast` status to orders table between `new` and `accepted`
+- Full status cycle: new → broadcast → accepted → preparing → ready → dispatched → on_way → delivered
+- Alternative: rejected, cancelled
 
 ### New Functions
 - `claim_order(order_id, driver_id)`: Transaction-safe function for claiming orders with race condition protection
-- `log_order_claim()`: Audit logging for claim attempts
-
-### New Views
-- `broadcasted_orders`: View of orders available for claiming
-- `driver_claimable_orders`: Helper view for RLS policies
+- `is_driver_assigned(target_driver_id)`: Checks if driver belongs to current user
+- `on_order_delivered(order_id)`: Finalizes delivered order (sales invoice + vendor balance with commission)
+- `trg_on_order_delivered()`: Trigger that auto-calls on_order_delivered when status becomes 'delivered'
 
 ### New Indexes
-- `idx_orders_broadcast_status`: For querying broadcasted orders
-- `idx_orders_claimed_by`: For tracking claimed orders by driver
-- Additional composite indexes for efficient queries
+- `idx_orders_broadcast`: Partial index on broadcast_at where status='broadcast' and claimed_by is null
+- `idx_orders_claimed_by`: Index on claimed_by
+- `idx_orders_driver`: Index on driver_id
 
 ## API Changes
 
@@ -44,14 +51,14 @@ This document outlines the implementation of the new order assignment flow that 
 - `POST /api/driver/claim-order`: Allows drivers to claim orders with transaction safety
 
 ### Modified Endpoints
-- `POST /api/orders`: Now sets status to "broadcast" instead of "new" with current timestamp
+- `POST /api/orders`: Now sets status to "broadcast" with broadcast_at timestamp
+- `PATCH /api/vendor/orders/[id]`: Updated for hybrid cycle (accept/reject/preparing/ready)
 - `GET /api/admin/orders`: Includes claim tracking fields in response
-- `PATCH /api/admin/orders`: Updated to handle "broadcast" status in allowed statuses
 
 ## Frontend Changes
 
 ### Driver Components
-- `AvailableOrders.tsx`: New component showing broadcast orders drivers can claim
+- `AvailableOrders.tsx`: Component showing broadcast orders drivers can claim with real-time updates
 - `DriverHome.tsx`: Updated to include available orders section
 
 ### Admin Components
@@ -61,39 +68,27 @@ This document outlines the implementation of the new order assignment flow that 
 
 ### RLS Policies Updated
 - `orders_driver_select_assigned_or_broadcast`: Allows drivers to see their assigned orders AND broadcast orders
-- Created audit logging system for tracking claim attempts
-- Function-level security for claim operations
+- `orders_customer_select_own`: Customers see only their own orders
+- `orders_vendor_rw_own`: Vendors can read/write their own orders
+- `orders_platform_admin_all`: Platform admins have full access
 
 ### Race Condition Protection
-- Implemented transaction-based claiming mechanism
-- Database locks prevent multiple drivers from claiming the same order
+- Implemented transaction-based claiming mechanism via `claim_order()` RPC function
+- Database locks (FOR UPDATE) prevent multiple drivers from claiming the same order
 - Clear error messages for failed claim attempts
 
 ## Deployment Instructions
 
-### Firebase Configuration
-All database changes are handled through Supabase migrations. No Firebase configuration is needed.
-
 ### Required Supabase Migrations
-1. `migration_022_broadcast_claim_system.sql`
-   - Adds new fields to orders table
-   - Creates claim_order function
-   - Adds status constraint updates
-
-2. `migration_023_broadcast_claim_rls_policies.sql`
-   - Updates RLS policies
-   - Creates audit log table
-   - Adds logging functions
-
-3. `indexes.sql`
-   - Creates performance indexes for efficient querying
+1. `migration_002→019` (base migrations, if not already applied)
+2. **`migration_024_broadcast_claim_fixed.sql`** — THE authoritative migration (supersedes 022/023)
+   - Do NOT apply 022/023 — they are broken and superseded by 024
+   - migration_024 drops and recreates all objects from 022/023
 
 ### CLI Commands to Deploy
 ```bash
-# Apply each migration in Supabase dashboard or via CLI
-supabase db push migration_022_broadcast_claim_system.sql
-supabase db push migration_023_broadcast_claim_rls_policies.sql
-supabase db push indexes.sql
+# Apply via Supabase Dashboard SQL Editor or CLI
+# migration_024 is idempotent — safe to run multiple times
 ```
 
 ### Testing Checklist
@@ -103,6 +98,7 @@ supabase db push indexes.sql
 4. Verify race condition protection
 5. Check admin dashboard shows proper status
 6. Confirm orders are automatically timestamped
+7. Verify commission calculation on delivery (commission_pct from platform_settings)
 
 ## Backward Compatibility
 - Existing orders without broadcast fields will continue to work
@@ -110,9 +106,26 @@ supabase db push indexes.sql
 - Admin assignment still works for non-broadcast orders if needed
 
 ## Monitoring
-- Claim attempts are logged in audit_log table
-- Error conditions have distinct error codes
+- Claim attempts return distinct error codes (DRIVER_NOT_FOUND_OR_INACTIVE, ORDER_NOT_AVAILABLE_FOR_CLAIM, etc.)
 - Performance indexes ensure efficient querying at scale
+- Realtime publication on orders and order_items tables
+
+## M0 Phase Status
+- [x] T0.1: migration_024_broadcast_claim_fixed.sql created
+- [x] T0.3: on_order_delivered() commission fix included in migration_024
+- [x] T0.4: lib/supabase/types.ts updated; as any removed from orders route; typecheck passes
+- [ ] T0.2: Apply migrations to live Supabase (MANUAL — requires owner action)
+
+## M1 Phase Status
+- [x] T1.1: Removed duplicate `<AvailableOrders/>` in DriverHome.tsx
+- [x] T1.2: Realtime channel name now unique per mount (`crypto.randomUUID()`)
+- [x] T1.3: Order creation includes `accepted_at` + `prep_status: "pending"`
+- [x] T1.4: Vendor actions updated for hybrid cycle (accept/reject/preparing/ready)
+- [x] T1.5: DriverHome uses real API data (`GET /api/driver/orders`) instead of mock
+- [x] T1.6: GET /api/driver/orders returns active tasks filtered by driver_id
+- [x] T1.7: Middleware is fast-path redirect; API routes enforce actual security boundary
+- [x] T1.8: Webhook idempotency (stripe_session_id check + 5min expiry + transaction insert)
+- [x] T1.9: Schema enforces `z.number().int().nonnegative()` for all amounts
 
 ## Future Enhancements
 - Driver performance metrics from claim history

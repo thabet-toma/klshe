@@ -10,7 +10,7 @@ import type { Database } from "@/lib/supabase/types";
 type OrderRow = Database["public"]["Tables"]["orders"]["Row"];
 type OrderUpdate = Database["public"]["Tables"]["orders"]["Update"];
 
-type VendorAction = "accept" | "reject" | "ready";
+type VendorAction = "accept" | "reject" | "preparing" | "ready";
 
 export async function PATCH(
   request: Request,
@@ -18,7 +18,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   if (!id) {
-    return NextResponse.json({ error: "معرّف الطلب مطلوب." }, { status: 400 });
+    return NextResponse.json({ error: "معرف الطلب مطلوب." }, { status: 400 });
   }
 
   const { denied, vendorIds } = await assertVendorApi();
@@ -38,9 +38,9 @@ export async function PATCH(
   }
 
   const action = body.action;
-  if (action !== "accept" && action !== "reject" && action !== "ready") {
+  if (action !== "accept" && action !== "reject" && action !== "preparing" && action !== "ready") {
     return NextResponse.json(
-      { error: 'يرجى إرسال action واحدة من: accept, reject, ready' },
+      { error: "يرجى إرسال action واحدة من: accept, reject, preparing, ready" },
       { status: 400 },
     );
   }
@@ -53,17 +53,23 @@ export async function PATCH(
           id,
           status:
             action === "accept"
-              ? "accepted"
+              ? "broadcast"
               : action === "reject"
                 ? "rejected"
-                : "ready",
+                : "broadcast",
+          prep_status:
+            action === "preparing"
+              ? "preparing"
+              : action === "ready"
+                ? "ready"
+                : undefined,
           accepted_at:
-            action === "accept" ? new Date().toISOString() : null,
-          ready_at: action === "ready" ? new Date().toISOString() : null,
+            action === "accept" ? new Date().toISOString() : undefined,
+          ready_at: action === "ready" ? new Date().toISOString() : undefined,
           cancellation_reason:
             action === "reject"
               ? (body.cancellationReason?.trim() ?? "مرفوض من المتجر")
-              : null,
+              : undefined,
         },
       });
     }
@@ -95,32 +101,50 @@ export async function PATCH(
   const patch: OrderUpdate = {};
 
   if (action === "accept") {
-    if (order.status !== "new") {
-      return NextResponse.json(
-        { error: "يمكن قبول الطلب فقط وهو بحالة «جديد»." },
-        { status: 409 },
-      );
-    }
-    patch.status = "accepted";
-    patch.accepted_at = now;
+    // الدورة الهجينة: الطلب مقبول تلقائياً عند الإنشاء — لا عملية فعلية
+    return NextResponse.json({ order: row });
   } else if (action === "reject") {
-    if (order.status !== "new" && order.status !== "accepted") {
+    if (
+      order.status === "dispatched" ||
+      order.status === "on_way" ||
+      order.status === "delivered"
+    ) {
       return NextResponse.json(
-        { error: "لا يمكن الرفض في هذه الحالة." },
+        { error: "لا يمكن رفض الطلب بعد إرساله." },
         { status: 409 },
       );
     }
     patch.status = "rejected";
     patch.cancellation_reason =
       body.cancellationReason?.trim() || "مرفوض من المتجر";
-  } else if (action === "ready") {
-    if (order.status !== "accepted" && order.status !== "preparing") {
+  } else if (action === "preparing") {
+    if (order.status !== "broadcast" && order.status !== "accepted") {
       return NextResponse.json(
-        { error: "يمكن تعيين «جاهز» بعد القبول أو التحضير." },
+        { error: "لا يمكن بدء التحضير في هذه الحالة." },
         { status: 409 },
       );
     }
-    patch.status = "ready";
+    if (order.claimed_by !== null) {
+      return NextResponse.json(
+        { error: "لا يمكن تعديل الطلب بعد مطالبته." },
+        { status: 409 },
+      );
+    }
+    patch.prep_status = "preparing";
+  } else if (action === "ready") {
+    if (order.status !== "broadcast" && order.status !== "accepted") {
+      return NextResponse.json(
+        { error: "لا يمكن تعيين «جاهز» في هذه الحالة." },
+        { status: 409 },
+      );
+    }
+    if (order.claimed_by !== null) {
+      return NextResponse.json(
+        { error: "لا يمكن تعديل الطلب بعد مطالبته." },
+        { status: 409 },
+      );
+    }
+    patch.prep_status = "ready";
     patch.ready_at = now;
   }
 
@@ -130,7 +154,7 @@ export async function PATCH(
     .eq("id", id)
     .eq("vendor_id", vendorId)
     .select(
-      "id, status, accepted_at, ready_at, picked_at, delivered_at, cancellation_reason",
+      "id, status, prep_status, accepted_at, ready_at, picked_at, delivered_at, cancellation_reason, claimed_by",
     )
     .maybeSingle();
 
