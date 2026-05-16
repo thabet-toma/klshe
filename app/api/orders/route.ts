@@ -261,6 +261,18 @@ export async function POST(request: Request) {
     );
   }
 
+  // T2.7: خصم المخزون ذرّياً عبر RPC (تحديث شرطي يمنع السالب والتسابق).
+  // غير حاجب للطلب: المنتج غير المتتبَّع أو نقص المخزون لا يُفشل الإنشاء.
+  if (resolvedVendorId) {
+    for (const item of payload.items) {
+      await (supabase as any).rpc("decrement_inventory", {
+        p_vendor_id: resolvedVendorId,
+        p_product_id: item.productId,
+        p_qty: item.quantity,
+      });
+    }
+  }
+
   return NextResponse.json(
     {
       id: createdOrder.id,

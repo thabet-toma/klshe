@@ -127,6 +127,15 @@ This document outlines the implementation of the new order assignment flow that 
 - [x] T1.8: Webhook idempotency (stripe_session_id check + 5min expiry + transaction insert)
 - [x] T1.9: Schema enforces `z.number().int().nonnegative()` for all amounts
 
+## M2 Phase Status
+- [x] T2.1: `skipVendorAuthBecauseDemo` / `skipAdminAuthBecauseDemo` now require `DEMO_MODE==='true'` AND `NODE_ENV !== 'production'`
+- [x] T2.2: Vendor summary pending filter updated to `['broadcast', 'dispatched', 'on_way']`
+- [x] T2.3: `driver_id`/`claimed_by` already typed as `text` in types + handled correctly in admin PATCH
+- [x] T2.4: OrderTrackingView rating error handling + CheckoutStepper loading guards (addressesLoading + estimating)
+- [x] T2.5: `lib/order-status.ts` = المصدر الوحيد. `lib/types.OrderStatus` و`lib/mock` يعيدان التصدير منه؛ هُجّرت OrderTrackingView/OrdersList/DriverOrdersList/DriverOrderDetails/AdminDashboard/OrdersBoard كلها إليه (لا خريطة حالة مكرّرة)
+- [x] T2.6: CORS allowlist logged at startup; rate-limit added to `/api/driver/claim-order`, `/api/payments/stripe/create-session`, `/api/auth/session`
+- [x] T2.7: خصم مخزون **ذرّي** عبر `migration_025` RPC `decrement_inventory` (تحديث شرطي `stock >= qty` يمنع السالب/التسابق) — استُبدل منطق read-then-write
+
 ## Future Enhancements
 - Driver performance metrics from claim history
 - Automatic order timeout system

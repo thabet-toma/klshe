@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, MapPin } from "lucide-react";
-import { statusLabels, statusStyles } from "@/lib/mock";
+import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
 
 type Tab = "active" | "delivered" | "all";

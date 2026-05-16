@@ -2,8 +2,20 @@ import { NextResponse } from "next/server";
 import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
 import { sendOrderStatusPush } from "@/lib/push/web-push";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const rl = await checkRateLimit({
+    key: `claim-order:${ip}`,
+    limit: 10,
+    windowMs: 60_000,
+    windowLabel: "1 m",
+  });
+  if (!rl.success) {
+    return NextResponse.json({ error: "محاولات كثيرة. انتظر قليلاً." }, { status: 429 });
+  }
+
   if (!isSupabaseServerConfigured) {
     return NextResponse.json({ error: "Supabase غير مهيأ." }, { status: 503 });
   }

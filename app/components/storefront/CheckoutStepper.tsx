@@ -63,6 +63,7 @@ export default function CheckoutStepper() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [savedAddresses, setSavedAddresses] = useState<AddressRow[]>([]);
+  const [addressesLoading, setAddressesLoading] = useState(true);
   const [selectedAddressId, setSelectedAddressId] = useState("");
   const [locationLat, setLocationLat] = useState<number | null>(null);
   const [locationLng, setLocationLng] = useState<number | null>(null);
@@ -93,6 +94,8 @@ export default function CheckoutStepper() {
         }
       } catch {
         // optional source
+      } finally {
+        if (active) setAddressesLoading(false);
       }
     })();
     return () => {
@@ -273,10 +276,11 @@ export default function CheckoutStepper() {
       return (
         Boolean(name.trim()) &&
         Boolean(phone.trim()) &&
-        Boolean(address.trim() || selectedAddressId)
+        Boolean(address.trim() || selectedAddressId) &&
+        !addressesLoading
       );
     }
-    if (step === 3) return Boolean(time);
+    if (step === 3) return Boolean(time) && !estimating;
     return true;
   };
 

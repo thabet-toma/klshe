@@ -1,10 +1,6 @@
-export type OrderStatus =
-  | "new"        // جديد - لم يُعيّن بعد
-  | "preparing"  // قيد التحضير
-  | "dispatched" // معيّن لسائق
-  | "on_way"     // في الطريق
-  | "delivered"  // تم التوصيل
-  | "cancelled"; // ملغي
+// مفردات الحالة الموحّدة — المصدر الوحيد lib/order-status.ts
+import type { OrderStatus } from "./order-status";
+export type { OrderStatus };
 
 export type PaymentMethod = "cash" | "card";
 

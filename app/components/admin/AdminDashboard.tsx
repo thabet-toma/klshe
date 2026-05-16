@@ -13,7 +13,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useOrders } from "@/lib/stores/orders-store";
-import { drivers, statusLabels, statusStyles } from "@/lib/mock";
+import { drivers } from "@/lib/mock";
+import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
 
 export default function AdminDashboard() {

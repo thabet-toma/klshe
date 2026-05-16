@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getFirebaseSession } from "@/lib/firebase/session";
-import { isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
 
 export async function requirePlatformAdmin(): Promise<{
@@ -42,7 +41,7 @@ export async function requirePlatformAdmin(): Promise<{
 }
 
 export function skipAdminAuthBecauseDemo(): boolean {
-  return !isFirebaseAdminConfigured;
+  return process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
 }
 
 export async function assertAdminApi(): Promise<NextResponse | null> {

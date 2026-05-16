@@ -15,7 +15,7 @@ import {
   Phone,
   Truck,
 } from "lucide-react";
-import { statusLabels, statusStyles } from "@/lib/mock";
+import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
 
 type DriverOrder = {

@@ -72,7 +72,7 @@ export async function GET(request: Request) {
       .from("orders")
       .select("id", { count: "exact", head: true })
       .eq("vendor_id", vendorId)
-      .in("status", ["new", "preparing", "dispatched", "on_way"]),
+      .in("status", ["broadcast", "dispatched", "on_way"]),
     supabase
       .from("orders")
       .select("id, total, status, created_at")

@@ -3,8 +3,20 @@ import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { agorotToShekel } from "@/lib/currency/agorot";
 import { getStripeClient } from "@/lib/payments/stripe";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const rl = await checkRateLimit({
+    key: `stripe-session:${ip}`,
+    limit: 10,
+    windowMs: 60_000,
+    windowLabel: "1 m",
+  });
+  if (!rl.success) {
+    return NextResponse.json({ error: "محاولات كثيرة. انتظر قليلاً." }, { status: 429 });
+  }
+
   const stripe = getStripeClient();
   if (!stripe) {
     return NextResponse.json({ error: "Stripe is not configured." }, { status: 503 });

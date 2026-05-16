@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock, MapPin, Phone, Truck, UserCheck } from "lucide-react";
 import { formatPrice } from "@/lib/data";
+import { statusLabel } from "@/lib/order-status";
 import type { Driver } from "@/lib/types";
 import { createBrowserSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -27,18 +28,6 @@ type OrderRow = {
   order_items: { id: number; product_name: string; quantity: number; line_total: number }[];
 };
 
-const statusLabels: Record<string, string> = {
-  new: "جديد",
-  broadcast: "مبثّ",
-  accepted: "مقبول",
-  preparing: "تحضير",
-  ready: "جاهز",
-  dispatched: "معيّن",
-  on_way: "في الطريق",
-  delivered: "مكتمل",
-  cancelled: "ملغي",
-  rejected: "مرفوض",
-};
 
 const statusActions = [
   { status: "preparing", label: "قيد التحضير" },
@@ -179,7 +168,7 @@ export default function OrdersBoard() {
                   active ? "bg-brand-gradient text-white shadow-pop" : "bg-white ring-1 ring-black/5"
                 }`}
               >
-                {s === "all" ? "الكل" : (statusLabels[s] ?? s)}
+                {s === "all" ? "الكل" : statusLabel(s)}
                 <span className={`rounded-full px-1 text-[10px] ${active ? "bg-white/30" : "bg-neutral-100"}`}>
                   {count}
                 </span>
@@ -202,7 +191,7 @@ export default function OrdersBoard() {
               <button type="button" onClick={() => setFocused(o)} className="flex w-full flex-col gap-3 rounded-2xl bg-white p-4 text-start shadow-soft ring-1 ring-black/5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="rounded-full bg-neutral-100 px-2 py-1 text-xs font-extrabold">{o.short_code}</span>
-                  <span className="text-xs font-bold text-neutral-600">{statusLabels[o.status] ?? o.status}</span>
+                  <span className="text-xs font-bold text-neutral-600">{statusLabel(o.status)}</span>
                 </div>
                 <p className="text-sm font-extrabold">{o.customer_name}</p>
                 <p className="line-clamp-1 text-xs text-neutral-600">{o.customer_address}</p>

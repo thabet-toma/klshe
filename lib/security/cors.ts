@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server";
 
+let _cached: string[] | null = null;
+let _logged = false;
+
 function parseAllowedOrigins(): string[] {
+  if (_cached) return _cached;
   const raw = process.env.CORS_ALLOWLIST ?? "";
-  return raw
+  _cached = raw
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
+  if (!_logged) {
+    _logged = true;
+    if (_cached.length === 0) {
+      console.warn("[CORS] CORS_ALLOWLIST is empty — all origins will receive Access-Control-Allow-Origin: null");
+    } else {
+      console.log("[CORS] Allowed origins:", _cached.join(", "));
+    }
+  }
+  return _cached;
 }
 
 export function corsHeaders(origin: string | null) {

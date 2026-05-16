@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronLeft, Receipt } from "lucide-react";
-import { statusLabels, statusStyles } from "@/lib/mock";
+import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
 import { createBrowserSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 

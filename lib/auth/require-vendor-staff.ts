@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getFirebaseSession } from "@/lib/firebase/session";
-import { isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
 import { DEFAULT_VENDOR_ID } from "@/lib/vendors/default-vendor";
 
@@ -58,7 +57,7 @@ export async function requireVendorAccess(): Promise<{
 }
 
 export function skipVendorAuthBecauseDemo(): boolean {
-  return !isFirebaseAdminConfigured;
+  return process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
 }
 
 export type VendorApiContext = {

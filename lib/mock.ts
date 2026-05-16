@@ -369,20 +369,5 @@ export const inventory: InventoryItem[] = [
   })),
 ];
 
-export const statusLabels: Record<Order["status"], string> = {
-  new: "جديد",
-  preparing: "قيد التحضير",
-  dispatched: "بانتظار الاستلام",
-  on_way: "في الطريق",
-  delivered: "تم التوصيل",
-  cancelled: "ملغي",
-};
-
-export const statusStyles: Record<Order["status"], string> = {
-  new: "bg-blue-100 text-blue-700 ring-blue-200",
-  preparing: "bg-amber-100 text-amber-700 ring-amber-200",
-  dispatched: "bg-violet-100 text-violet-700 ring-violet-200",
-  on_way: "bg-indigo-100 text-indigo-700 ring-indigo-200",
-  delivered: "bg-emerald-100 text-emerald-700 ring-emerald-200",
-  cancelled: "bg-rose-100 text-rose-700 ring-rose-200",
-};
+// المصدر الوحيد لمفردات الحالة: lib/order-status.ts (إعادة تصدير لتوافق الاستيرادات القديمة)
+export { statusLabels, statusStyles } from "./order-status";

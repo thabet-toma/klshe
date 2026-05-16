@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createHash } from "crypto";
 import { getAdminAuth, isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/security/rate-limit";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
@@ -20,6 +21,17 @@ function firebaseUidToUuid(uid: string): string {
 
 // POST /api/auth/session — verify Firebase ID token, sync Supabase profile, set session cookies
 export async function POST(request: Request) {
+  const ip = request.headers.get("x-forwarded-for") ?? "unknown";
+  const rl = await checkRateLimit({
+    key: `auth-session:${ip}`,
+    limit: 20,
+    windowMs: 60_000,
+    windowLabel: "1 m",
+  });
+  if (!rl.success) {
+    return NextResponse.json({ error: "محاولات كثيرة. انتظر قليلاً." }, { status: 429 });
+  }
+
   if (!isFirebaseAdminConfigured) {
     return NextResponse.json({ error: "Firebase Admin غير مهيأ." }, { status: 503 });
   }

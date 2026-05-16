@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, Bike, Check, ChefHat, Home, MapPin, PackageCheck, Phone, Receipt } from "lucide-react";
-import { statusLabels, statusStyles } from "@/lib/mock";
+import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
 import type { OrderStatus } from "@/lib/types";
 import { createBrowserSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -52,6 +52,7 @@ export default function OrderTrackingView({ orderId }: Props) {
   const [driverRating, setDriverRating] = useState(5);
   const [comment, setComment] = useState("");
   const [ratingBusy, setRatingBusy] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -139,6 +140,7 @@ export default function OrderTrackingView({ orderId }: Props) {
 
   async function submitRating() {
     setRatingBusy(true);
+    setRatingError(null);
     try {
       const r = await fetch(`/api/storefront/orders/${encodeURIComponent(orderId)}`, {
         method: "POST",
@@ -146,8 +148,13 @@ export default function OrderTrackingView({ orderId }: Props) {
         body: JSON.stringify({ vendorRating, driverRating, comment }),
       });
       const j = (await r.json()) as { rating?: ApiRating; error?: string };
-      if (!r.ok) return;
+      if (!r.ok) {
+        setRatingError(j.error ?? "فشل إرسال التقييم. أعد المحاولة.");
+        return;
+      }
       setRating(j.rating ?? null);
+    } catch {
+      setRatingError("تعذر الاتصال بالخادم.");
     } finally {
       setRatingBusy(false);
     }
@@ -238,6 +245,7 @@ export default function OrderTrackingView({ orderId }: Props) {
           >
             {ratingBusy ? "جار الحفظ..." : rating ? "تحديث التقييم" : "إرسال التقييم"}
           </button>
+          {ratingError && <p className="mt-2 text-xs font-bold text-rose-600">{ratingError}</p>}
         </section>
       )}
 
