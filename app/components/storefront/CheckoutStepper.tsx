@@ -260,11 +260,12 @@ export default function CheckoutStepper() {
         }
       }
       router.push(`/orders/${created.id}`);
-    } catch {
-      addOrder(newOrder);
-      clearCart();
-      router.push(`/orders/${id}`);
-      setSubmitError("تم حفظ الطلب محلياً. تأكد من إعداد Supabase للمزامنة.");
+    } catch (err) {
+      // فشل حقيقي: لا تنشئ طلباً وهمياً ولا توجّه لصفحة طلب غير موجود.
+      // أبقِ السلة كما هي ليعيد المستخدم المحاولة، واعرض الخطأ الفعلي.
+      setSubmitError(
+        err instanceof Error ? err.message : "تعذّر إتمام الطلب. أعد المحاولة.",
+      );
     } finally {
       setSubmitting(false);
     }

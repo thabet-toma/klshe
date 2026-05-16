@@ -1,35 +1,27 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 
 export async function GET() {
   if (!isSupabaseServerConfigured) {
     return NextResponse.json({ error: "Supabase غير مهيأ." }, { status: 503 });
   }
 
-  const routeSb = await createRouteHandlerSupabase();
-  if (!routeSb) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await routeSb.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
-  const { data: driverRow } = await routeSb
+  const { data: driverRow } = await supabase
     .from("delivery_drivers")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", identity.profileId)
     .maybeSingle();
 
   if (!driverRow?.id) {
     return NextResponse.json({ error: "حسابك ليس سائقاً معتمداً." }, { status: 403 });
   }
 
-  const supabase = createServerSupabase();
   const { data, error } = await supabase
     .from("orders")
     .select(

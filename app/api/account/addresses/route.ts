@@ -1,19 +1,13 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { createAddressSchema, type CreateAddressInput } from "@/lib/schemas/address";
 
 export async function GET() {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   const { data, error } = await supabase
     .from("addresses")
@@ -29,17 +23,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   let body: CreateAddressInput;
   try {
@@ -56,13 +43,13 @@ export async function POST(request: Request) {
 
   const isDefault = body.isDefault === true;
   if (isDefault) {
-    await supabase.from("addresses").update({ is_default: false }).eq("profile_id", user.id);
+    await supabase.from("addresses").update({ is_default: false }).eq("profile_id", identity.profileId);
   }
 
   const { data, error } = await supabase
     .from("addresses")
     .insert({
-      profile_id: user.id,
+      profile_id: identity.profileId,
       label: body.label?.trim() || null,
       line1,
       city: body.city?.trim() || null,

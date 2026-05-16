@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import type { Database } from "@/lib/supabase/types";
 import { updateAddressSchema, type UpdateAddressInput } from "@/lib/schemas/address";
 
@@ -7,17 +8,10 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
@@ -46,7 +40,7 @@ export async function PATCH(
   }
 
   if (body.isDefault === true) {
-    await supabase.from("addresses").update({ is_default: false }).eq("profile_id", user.id);
+    await supabase.from("addresses").update({ is_default: false }).eq("profile_id", identity.profileId);
     patch.is_default = true;
   } else if (body.isDefault === false) {
     patch.is_default = false;
@@ -60,7 +54,7 @@ export async function PATCH(
     .from("addresses")
     .update(patch)
     .eq("id", id)
-    .eq("profile_id", user.id)
+    .eq("profile_id", identity.profileId)
     .select("id, label, line1, city, lat, lng, is_default, created_at")
     .maybeSingle();
 
@@ -74,17 +68,10 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
@@ -93,7 +80,7 @@ export async function DELETE(
     .from("addresses")
     .delete()
     .eq("id", id)
-    .eq("profile_id", user.id);
+    .eq("profile_id", identity.profileId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

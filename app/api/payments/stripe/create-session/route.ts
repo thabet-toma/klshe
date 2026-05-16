@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { agorotToShekel } from "@/lib/currency/agorot";
 import { getStripeClient } from "@/lib/payments/stripe";
 import { checkRateLimit } from "@/lib/security/rate-limit";
@@ -22,14 +22,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Stripe is not configured." }, { status: 503 });
   }
 
-  const supabaseAuth = await createRouteHandlerSupabase();
-  if (!supabaseAuth) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
-  const {
-    data: { user },
-  } = await supabaseAuth.auth.getUser();
-  if (!user) return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
   let body: { orderId?: string };
   try {
@@ -46,7 +40,7 @@ export async function POST(request: Request) {
     .from("orders")
     .select("id, short_code, total, customer_id")
     .eq("id", orderId)
-    .eq("customer_id", user.id)
+    .eq("customer_id", identity.profileId)
     .maybeSingle();
 
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });

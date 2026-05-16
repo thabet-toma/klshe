@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { sendOrderStatusPush } from "@/lib/push/web-push";
 
 type DriverAction = "pickup" | "start" | "arrived" | "delivered";
@@ -13,22 +13,15 @@ export async function GET(
     return NextResponse.json({ error: "Supabase غير مهيأ." }, { status: 503 });
   }
 
-  const routeSb = await createRouteHandlerSupabase();
-  if (!routeSb) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await routeSb.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
-  const { data: driverRow } = await routeSb
+  const { data: driverRow } = await supabase
     .from("delivery_drivers")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", identity.profileId)
     .maybeSingle();
   if (!driverRow?.id) {
     return NextResponse.json({ error: "حسابك ليس سائقاً معتمداً." }, { status: 403 });
@@ -37,7 +30,6 @@ export async function GET(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
 
-  const supabase = createServerSupabase();
   const { data, error } = await supabase
     .from("orders")
     .select(
@@ -83,35 +75,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Supabase غير مهيأ." }, { status: 503 });
   }
 
-  const routeSb = await createRouteHandlerSupabase();
-  if (!routeSb) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await routeSb.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
-  const { data: profile } = await routeSb
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const { data: driverRow } = await routeSb
+  const { data: driverRow } = await supabase
     .from("delivery_drivers")
     .select("id")
-    .eq("user_id", user.id)
+    .eq("user_id", identity.profileId)
     .maybeSingle();
 
-  if (profile?.role !== "driver" && !driverRow?.id) {
+  if (!driverRow?.id) {
     return NextResponse.json({ error: "حسابك ليس سائقاً معتمداً." }, { status: 403 });
   }
 
-  const driverId = driverRow?.id;
+  const driverId = driverRow.id;
   if (!driverId) {
     return NextResponse.json({ error: "لا يوجد سجل سائق لهذا الحساب." }, { status: 403 });
   }
@@ -134,7 +113,6 @@ export async function PATCH(
     );
   }
 
-  const supabase = createServerSupabase();
   const { data: order, error: orderErr } = await supabase
     .from("orders")
     .select("id, status, driver_id, picked_at")

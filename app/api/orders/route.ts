@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { DEFAULT_VENDOR_ID } from "@/lib/vendors/default-vendor";
 import { normalizeAgorot } from "@/lib/currency/agorot";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/schemas/orders";
@@ -46,25 +46,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400, headers: corsHeaders(origin) });
   }
 
-  const routeSb = await createRouteHandlerSupabase();
-  if (!routeSb) {
-    return NextResponse.json(
-      { error: "لم يُضبط الاتصال بـ Supabase." },
-      { status: 503, headers: corsHeaders(origin) },
-    );
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await routeSb.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { error: "يجب تسجيل الدخول لإتمام الطلب." },
-      { status: 401, headers: corsHeaders(origin) },
-    );
-  }
-
-  const customerId = user.id;
+  const customerId = identity.profileId;
 
   if (!payload.items?.length) {
     return NextResponse.json({ error: "Order must contain items." }, { status: 400, headers: corsHeaders(origin) });
@@ -199,6 +184,8 @@ export async function POST(request: Request) {
     }
   }
 
+  const isCardPayment = payload.paymentMethod === "card";
+
   const { data: createdOrder, error: orderError } = await supabase
     .from("orders")
     .insert({
@@ -213,12 +200,12 @@ export async function POST(request: Request) {
       total: totalAgorot,
       discount_amount: resolvedDiscountAmount,
       coupon_code: resolvedCouponCode,
-      status: "broadcast",
+      status: isCardPayment ? "new" : "broadcast",
       payment_method: payload.paymentMethod,
       notes: payload.notes ?? null,
       vendor_id: resolvedVendorId,
-      broadcast_at: new Date().toISOString(),
-      accepted_at: new Date().toISOString(),
+      broadcast_at: isCardPayment ? null : new Date().toISOString(),
+      accepted_at: isCardPayment ? null : new Date().toISOString(),
       prep_status: "pending",
       customer_id: customerId,
       address_id: resolvedAddressId,

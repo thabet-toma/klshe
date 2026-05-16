@@ -8,6 +8,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
 import PushSubscriptionCard from "@/app/components/storefront/PushSubscriptionCard";
 import AccountSettingsCard from "@/app/components/storefront/AccountSettingsCard";
+import RoleDashboardCard from "@/app/components/storefront/RoleDashboardCard";
 
 export default function AccountPage() {
   const router = useRouter();
@@ -124,6 +125,8 @@ export default function AccountPage() {
           </Link>
         </section>
       )}
+
+      {email && <RoleDashboardCard />}
 
       <AccountSettingsCard />
 

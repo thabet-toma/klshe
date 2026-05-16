@@ -1,21 +1,15 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
@@ -62,7 +56,7 @@ export async function GET(
     `,
     )
     .eq("id", id)
-    .eq("customer_id", user.id)
+    .eq("customer_id", identity.profileId)
     .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -105,16 +99,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
+
+  const supabase = createServerSupabase();
+
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
 
@@ -138,7 +127,7 @@ export async function POST(
     .from("orders")
     .select("id, customer_id, status, vendor_id, driver_id")
     .eq("id", id)
-    .eq("customer_id", user.id)
+    .eq("customer_id", identity.profileId)
     .maybeSingle();
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
   if (!order) return NextResponse.json({ error: "الطلب غير موجود." }, { status: 404 });
@@ -154,7 +143,7 @@ export async function POST(
     .upsert(
       {
         order_id: order.id,
-        customer_id: user.id,
+        customer_id: identity.profileId,
         vendor_id: order.vendor_id,
         driver_id: order.driver_id,
         vendor_rating: vendorRating,

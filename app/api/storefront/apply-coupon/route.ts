@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 
 export async function POST(request: Request) {
@@ -12,10 +12,7 @@ export async function POST(request: Request) {
   });
   if (!rl.success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const supabase = createServerSupabase();
 
   let body: { code?: string; subtotal?: number };
   try {

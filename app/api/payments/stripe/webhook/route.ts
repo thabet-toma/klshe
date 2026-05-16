@@ -58,6 +58,7 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (order) {
+        const now = new Date().toISOString();
         await supabase.from("transactions").insert({
           order_id: order.id,
           type: "sale",
@@ -67,6 +68,18 @@ export async function POST(request: Request) {
           stripe_session_id: stripeSessionId,
           note: `Stripe paid session: ${session.id}`,
         });
+
+        // Broadcast the order now that payment is confirmed
+        await supabase
+          .from("orders")
+          .update({
+            status: "broadcast",
+            broadcast_at: now,
+            accepted_at: now,
+          })
+          .eq("id", order.id)
+          .eq("status", "new");
+
         log.info("stripe_payment_confirmed", { order_id: order.id, amount: order.total, session_id: stripeSessionId });
       }
     }

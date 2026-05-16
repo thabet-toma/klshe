@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 
 export async function PUT(request: Request) {
-  const authSb = await createRouteHandlerSupabase();
-  if (!authSb) return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-
-  const { data: { user } } = await authSb.auth.getUser();
-  if (!user) return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
   let body: { lat?: number; lng?: number };
   try {
@@ -29,7 +26,7 @@ export async function PUT(request: Request) {
   const { error } = await (supabase as any)
     .from("delivery_drivers")
     .update({ current_lat: lat, current_lng: lng })
-    .eq("user_id", user.id);
+    .eq("user_id", identity.profileId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

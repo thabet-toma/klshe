@@ -1,24 +1,18 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 
 /** قائمة معرفات المنتجات المفضّلة للمستخدم المسجّل — بدون جلسة تُرجع مصفوفة فارغة. */
 export async function GET() {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ ids: [] as string[] });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return NextResponse.json({ ids: [] as string[] });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ ids: [] as string[] });
-  }
+  const supabase = createServerSupabase();
 
   const { data, error } = await supabase
     .from("favorites")
     .select("product_id")
-    .eq("user_id", user.id);
+    .eq("user_id", identity.profileId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -35,17 +29,10 @@ type PostBody = {
 
 /** إضافة منتج للمفضلة — يتحقق من vendor عبر المنتج إن لزم. */
 export async function POST(request: Request) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   let body: PostBody;
   try {
@@ -79,7 +66,7 @@ export async function POST(request: Request) {
   }
 
   const { error } = await supabase.from("favorites").insert({
-    user_id: user.id,
+    user_id: identity.profileId,
     product_id: productId,
     vendor_id: vendorId,
   });
@@ -96,17 +83,10 @@ export async function POST(request: Request) {
 
 /** إزالة منتج من المفضلة. */
 export async function DELETE(request: Request) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   const productId = new URL(request.url).searchParams.get("productId") ?? "";
   if (!productId) {
@@ -116,7 +96,7 @@ export async function DELETE(request: Request) {
   const { error } = await supabase
     .from("favorites")
     .delete()
-    .eq("user_id", user.id)
+    .eq("user_id", identity.profileId)
     .eq("product_id", productId);
 
   if (error) {

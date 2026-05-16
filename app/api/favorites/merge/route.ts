@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 
 type Body = { productIds?: unknown };
 
@@ -7,17 +8,10 @@ type Body = { productIds?: unknown };
  * بعد تسجيل الدخول: دمج معرفات محلية مع السيرفر — يُدرج كل منتج نشط مرة واحدة.
  */
 export async function POST(request: Request) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   let body: Body;
   try {
@@ -36,7 +30,7 @@ export async function POST(request: Request) {
     const { data } = await supabase
       .from("favorites")
       .select("product_id")
-      .eq("user_id", user.id);
+      .eq("user_id", identity.profileId);
     const ids = (data ?? []).map((r) => r.product_id);
     return NextResponse.json({ ids });
   }
@@ -51,7 +45,7 @@ export async function POST(request: Request) {
     products
       ?.filter((p): p is typeof p & { vendor_id: string } => p.vendor_id != null)
       .map((p) => ({
-        user_id: user.id,
+        user_id: identity.profileId,
         product_id: p.id,
         vendor_id: p.vendor_id,
       })) ?? [];
@@ -66,7 +60,7 @@ export async function POST(request: Request) {
   const { data: all } = await supabase
     .from("favorites")
     .select("product_id")
-    .eq("user_id", user.id);
+    .eq("user_id", identity.profileId);
 
   const ids = (all ?? []).map((r) => r.product_id);
   return NextResponse.json({ ids });

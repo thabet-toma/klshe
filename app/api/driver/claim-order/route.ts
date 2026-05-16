@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
 import { createServerSupabase, isSupabaseServerConfigured } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { sendOrderStatusPush } from "@/lib/push/web-push";
 import { checkRateLimit } from "@/lib/security/rate-limit";
 import { log } from "@/lib/log";
@@ -21,23 +21,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Supabase غير مهيأ." }, { status: 503 });
   }
 
-  const routeSb = await createRouteHandlerSupabase();
-  if (!routeSb) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
 
-  const {
-    data: { user },
-  } = await routeSb.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const supabase = createServerSupabase();
 
   // Verify the user is an active driver
-  const { data: driverRow } = await routeSb
+  const { data: driverRow } = await supabase
     .from("delivery_drivers")
     .select("id, status")
-    .eq("user_id", user.id)
+    .eq("user_id", identity.profileId)
     .maybeSingle();
 
   if (!driverRow?.id) {
@@ -61,8 +54,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "orderId مطلوب." }, { status: 400 });
   }
 
-  const supabase = createServerSupabase();
-  
   // Use a transaction to safely claim the order
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any).rpc('claim_order', {

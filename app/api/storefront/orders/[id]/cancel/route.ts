@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { log } from "@/lib/log";
 import { sendOrderStatusPush } from "@/lib/push/web-push";
 
@@ -7,16 +8,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) {
-    return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  }
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
-  }
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
+
+  const supabase = createServerSupabase();
+
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id مطلوب." }, { status: 400 });
 
@@ -31,7 +27,7 @@ export async function POST(
     .from("orders")
     .select("id, customer_id, status, claimed_by")
     .eq("id", id)
-    .eq("customer_id", user.id)
+    .eq("customer_id", identity.profileId)
     .maybeSingle();
   if (orderErr) return NextResponse.json({ error: orderErr.message }, { status: 500 });
   if (!order) return NextResponse.json({ error: "الطلب غير موجود." }, { status: 404 });
@@ -47,7 +43,7 @@ export async function POST(
     .from("orders")
     .update({ status: "cancelled", cancellation_reason: body.reason?.trim() || null })
     .eq("id", id)
-    .eq("customer_id", user.id);
+    .eq("customer_id", identity.profileId);
 
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 });
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createRouteHandlerSupabase } from "@/lib/auth/route-supabase";
+import { createServerSupabase } from "@/lib/supabase/server";
+import { guardOrError } from "@/lib/auth/guard";
 import { getVapidPublicKey } from "@/lib/push/web-push";
 
 type SubBody = {
@@ -12,12 +13,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
+
+  const supabase = createServerSupabase();
 
   let body: SubBody;
   try {
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
 
   const { error } = await supabase.from("push_subscriptions").upsert(
     {
-      user_id: user.id,
+      user_id: identity.profileId,
       endpoint,
       p256dh,
       auth,
@@ -46,12 +45,10 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const supabase = await createRouteHandlerSupabase();
-  if (!supabase) return NextResponse.json({ error: "الخدمة غير مهيأة." }, { status: 503 });
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "يجب تسجيل الدخول." }, { status: 401 });
+  const identity = await guardOrError();
+  if (identity instanceof NextResponse) return identity;
+
+  const supabase = createServerSupabase();
 
   let body: { endpoint?: string };
   try {
@@ -65,7 +62,7 @@ export async function DELETE(request: Request) {
   const { error } = await supabase
     .from("push_subscriptions")
     .delete()
-    .eq("user_id", user.id)
+    .eq("user_id", identity.profileId)
     .eq("endpoint", endpoint);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
