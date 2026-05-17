@@ -42,6 +42,13 @@ export async function PATCH(
   if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
 
   if (body.action === "approve") {
+    // ترقية الدور (الجذر): بدونها middleware/الجلسة يبقيان customer فلا تصل اللوحة.
+    if (req.requested_role === "driver" || req.requested_role === "vendor_staff") {
+      await supabase
+        .from("profiles")
+        .update({ role: req.requested_role })
+        .eq("id", req.user_id);
+    }
     if (req.requested_role === "driver") {
       await supabase.from("delivery_drivers").upsert({
         id: req.user_id,

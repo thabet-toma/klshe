@@ -42,6 +42,7 @@ export default function LoginForm({
   const [loading, setLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isNative, setIsNative] = useState(false);
+  const [onb, setOnb] = useState<{ role: string; status: string; note: string | null } | null>(null);
 
   useEffect(() => {
     // Detect Capacitor native platform — Google popup is blocked in WebView
@@ -76,6 +77,27 @@ export default function LoginForm({
 
   async function finishLogin(idToken: string) {
     const { role } = await createSession(idToken);
+    // T2.4: دور معتمَد ⇒ توجيه مباشر للوحة.
+    if (role === "driver" || role === "vendor_staff" || role === "platform_admin") {
+      redirectAfterLogin(role);
+      return;
+    }
+    // زبون: افحص طلب الاعتماد (معلّق/مرفوض/معتمَد) واعرض حالته بدل توجيه صامت.
+    try {
+      const r = await fetch("/api/onboarding-requests");
+      if (r.ok) {
+        const j = (await r.json()) as {
+          requests?: { requested_role: string; status: string; note: string | null }[];
+        };
+        const req = (j.requests ?? []).find((x) => x.requested_role !== "customer");
+        if (req) {
+          setOnb({ role: req.requested_role, status: req.status, note: req.note });
+          return;
+        }
+      }
+    } catch {
+      /* تجاهل — أكمل كزبون */
+    }
     redirectAfterLogin(role);
   }
 
@@ -131,6 +153,53 @@ export default function LoginForm({
     }
   }
 
+  if (onb) {
+    const roleLabel = onb.role === "driver" ? "سائق" : "بائع/متجر";
+    const dash = onb.role === "driver" ? "/driver" : "/vendor";
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center bg-neutral-100 px-4 py-10">
+        <div className="w-full max-w-md rounded-3xl border border-black/5 bg-white p-8 shadow-card text-center">
+          <p className="text-sm font-extrabold text-brand-600">{BRAND_NAME}</p>
+          <h1 className="mt-2 text-xl font-extrabold">طلب الانضمام كـ{roleLabel}</h1>
+
+          {onb.status === "pending" && (
+            <div className="mt-4 rounded-2xl bg-blue-50 px-4 py-4 text-sm text-blue-900">
+              <p className="font-extrabold">طلبك قيد المراجعة ⏳</p>
+              <p className="mt-1 text-blue-700">سيراجعه المشرف ويُفعّل حسابك قريباً. يمكنك المتابعة كزبون الآن.</p>
+            </div>
+          )}
+          {onb.status === "approved" && (
+            <div className="mt-4 rounded-2xl bg-emerald-50 px-4 py-4 text-sm text-emerald-900">
+              <p className="font-extrabold">تم اعتماد طلبك ✓</p>
+              <p className="mt-1 text-emerald-700">سجّل الخروج ثم الدخول مجدداً لتفعيل لوحتك، أو افتحها الآن:</p>
+              <Link
+                href={dash}
+                className="mt-3 inline-flex rounded-2xl bg-brand-gradient px-5 py-2.5 text-sm font-extrabold text-white shadow-pop"
+              >
+                فتح لوحة الـ{roleLabel}
+              </Link>
+            </div>
+          )}
+          {onb.status === "rejected" && (
+            <div className="mt-4 rounded-2xl bg-rose-50 px-4 py-4 text-sm text-rose-900">
+              <p className="font-extrabold">نعتذر، طلبك مرفوض</p>
+              {onb.note && <p className="mt-1 text-rose-700">ملاحظة: {onb.note}</p>}
+              <p className="mt-1 text-rose-700">يمكنك المتابعة كزبون أو التواصل مع الدعم.</p>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => router.push("/")}
+            className="mt-5 w-full rounded-2xl bg-neutral-900 py-3 text-sm font-extrabold text-white"
+          >
+            المتابعة كزبون
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-neutral-100 px-4 py-10">
       <div className="w-full max-w-md rounded-3xl border border-black/5 bg-white p-8 shadow-card">
@@ -176,28 +245,29 @@ export default function LoginForm({
           </button>
         </div>
 
-        {/* Google sign-in — hidden in Capacitor WebView where popups are blocked */}
-        {!isNative && (
-          <>
-            <button
-              type="button"
-              onClick={handleGoogle}
-              disabled={loading || !isFirebaseConfigured}
-              className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-            >
-              <GoogleIcon />
-              {loading ? "جارٍ…" : "المتابعة مع Google"}
-            </button>
-
-            <div className="my-4 flex items-center gap-3">
-              <div className="h-px flex-1 bg-black/8" />
-              <span className="text-xs text-neutral-400">أو</span>
-              <div className="h-px flex-1 bg-black/8" />
-            </div>
-          </>
+        {/* T2.5: زر Google ثابت الظهور — يُعطّل برسالة لا يختفي */}
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading || !isFirebaseConfigured || isNative}
+          className="mt-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          <GoogleIcon />
+          {loading ? "جارٍ…" : "المتابعة مع Google"}
+        </button>
+        {(isNative || !isFirebaseConfigured) && (
+          <p className="mt-2 text-center text-xs text-neutral-500">
+            {isNative
+              ? "تسجيل الدخول عبر Google غير متاح داخل التطبيق — استخدم البريد وكلمة المرور."
+              : "Google غير متاح: لم تُضبط مفاتيح Firebase."}
+          </p>
         )}
 
-        {isNative && <div className="my-4" />}
+        <div className="my-4 flex items-center gap-3">
+          <div className="h-px flex-1 bg-black/8" />
+          <span className="text-xs text-neutral-400">أو</span>
+          <div className="h-px flex-1 bg-black/8" />
+        </div>
 
         {/* Email/password form */}
         <form onSubmit={handleEmailAuth} className="space-y-4">

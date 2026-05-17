@@ -144,11 +144,37 @@ export default function SignupForm() {
         )}
 
         <form onSubmit={handleEmailSignup} className="mt-5 space-y-4">
-          <div className="grid grid-cols-3 gap-2 rounded-2xl bg-neutral-100 p-1">
-            <button type="button" onClick={() => setRole("customer")} className={`rounded-xl px-2 py-2 text-xs font-extrabold ${role === "customer" ? "bg-white text-brand-700" : "text-neutral-600"}`}>زبون</button>
-            <button type="button" onClick={() => setRole("vendor_staff")} className={`rounded-xl px-2 py-2 text-xs font-extrabold ${role === "vendor_staff" ? "bg-white text-brand-700" : "text-neutral-600"}`}>متجر</button>
-            <button type="button" onClick={() => setRole("driver")} className={`rounded-xl px-2 py-2 text-xs font-extrabold ${role === "driver" ? "bg-white text-brand-700" : "text-neutral-600"}`}>سائق</button>
+          <div className="grid gap-2">
+            {([
+              { v: "customer", t: "زبون", d: "تصفّح المتاجر واطلب — تفعيل فوري بلا مراجعة." },
+              { v: "vendor_staff", t: "صاحب متجر", d: "أضف متجرك ومنتجاتك واستقبل الطلبات." },
+              { v: "driver", t: "سائق", d: "استلم الطلبات المبثوثة ووصّلها للزبائن." },
+            ] as { v: Role; t: string; d: string }[]).map((o) => (
+              <button
+                key={o.v}
+                type="button"
+                onClick={() => setRole(o.v)}
+                className={`rounded-2xl border p-3 text-right transition-colors ${
+                  role === o.v
+                    ? "border-brand-500 bg-brand-50"
+                    : "border-black/10 bg-neutral-50 hover:bg-neutral-100"
+                }`}
+              >
+                <span className="block text-sm font-extrabold text-neutral-900">{o.t}</span>
+                <span className="mt-0.5 block text-xs text-neutral-500">{o.d}</span>
+              </button>
+            ))}
           </div>
+
+          {role !== "customer" && (
+            <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              <p className="font-extrabold">سيُراجع طلبك قبل التفعيل</p>
+              <p className="mt-1 text-amber-800">
+                ستُنشئ حساباً وتُرسل طلب انضمام كـ{roleLabel}. تستخدم الحساب كزبون فوراً، وتتابع
+                حالة الطلب من «حسابي ← حالة طلب الانضمام».
+              </p>
+            </div>
+          )}
 
           <input
             value={fullName}
@@ -203,16 +229,22 @@ export default function SignupForm() {
           </button>
         </form>
 
-        {!isNative && (
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={loading || !isFirebaseConfigured}
-            className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
-          >
-            <GoogleIcon />
-            {loading ? "جارٍ…" : "التسجيل مع Google"}
-          </button>
+        {/* T2.5: زر Google ثابت الظهور — يُعطّل برسالة لا يختفي */}
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading || !isFirebaseConfigured || isNative}
+          className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
+        >
+          <GoogleIcon />
+          {loading ? "جارٍ…" : "التسجيل مع Google"}
+        </button>
+        {(isNative || !isFirebaseConfigured) && (
+          <p className="mt-2 text-center text-xs text-neutral-500">
+            {isNative
+              ? "التسجيل عبر Google غير متاح داخل التطبيق — استخدم البريد وكلمة المرور."
+              : "Google غير متاح: لم تُضبط مفاتيح Firebase."}
+          </p>
         )}
 
         <p className="mt-6 text-center text-xs text-neutral-500">

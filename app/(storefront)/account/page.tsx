@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Heart, Loader2, LogOut, MapPin, ShoppingBag, User } from "lucide-react";
+import { ClipboardList, Heart, Loader2, LogOut, MapPin, ShoppingBag, User } from "lucide-react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
 import PushSubscriptionCard from "@/app/components/storefront/PushSubscriptionCard";
@@ -124,6 +124,21 @@ export default function AccountPage() {
             <span className="text-xs font-extrabold text-neutral-900">المفضلة</span>
           </Link>
         </section>
+      )}
+
+      {email && (
+        <Link
+          href="/account/onboarding"
+          className="mt-4 flex items-center gap-3 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-black/5 hover:bg-neutral-50"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+            <ClipboardList className="h-4 w-4" strokeWidth={2.4} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-extrabold text-neutral-900">حالة طلب الانضمام</p>
+            <p className="text-xs text-neutral-500">تابع طلبك كسائق أو صاحب متجر.</p>
+          </div>
+        </Link>
       )}
 
       {email && <RoleDashboardCard />}
