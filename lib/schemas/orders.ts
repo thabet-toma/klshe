@@ -20,7 +20,7 @@ export const createOrderSchema = z.object({
   subtotal: z.number().int().nonnegative(),
   deliveryFee: z.number().int().nonnegative(),
   discountAmount: z.number().int().nonnegative().optional(),
-  couponCode: z.string().trim().optional(),
+  couponCode: z.string().trim().nullable().optional(),
   total: z.number().int().nonnegative(),
   paymentMethod: z.enum(["cash", "card"]),
   notes: z.string().optional(),
