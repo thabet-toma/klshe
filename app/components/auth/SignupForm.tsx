@@ -3,7 +3,12 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import {
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  signInWithCredential,
+  GoogleAuthProvider,
+} from "firebase/auth";
 import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase/config";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -110,16 +115,37 @@ export default function SignupForm() {
 
     setLoading(true);
     try {
-      const result = await signInWithPopup(firebaseAuth, googleProvider);
-      await finishSignup(await result.user.getIdToken());
+      let idToken: string;
+      if (isNative) {
+        const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+        const result = await FirebaseAuthentication.signInWithGoogle({ skipNativeAuth: true });
+        const googleIdToken = result.credential?.idToken;
+        if (!googleIdToken) throw new Error("لم نستلم رمز جوجل من التطبيق.");
+        const cred = await signInWithCredential(
+          firebaseAuth,
+          GoogleAuthProvider.credential(googleIdToken),
+        );
+        idToken = await cred.user.getIdToken();
+      } else {
+        const result = await signInWithPopup(firebaseAuth, googleProvider);
+        idToken = await result.user.getIdToken();
+      }
+      await finishSignup(idToken);
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? "";
-      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
-        // user cancelled
+      const msg = err instanceof Error ? err.message : "";
+      if (
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/cancelled-popup-request" ||
+        /cancel|closed|12501/i.test(msg)
+      ) {
+        // ألغى المستخدم العملية
       } else if (code === "auth/popup-blocked") {
         setError("المتصفح حظر النافذة المنبثقة. اسمح بالنوافذ المنبثقة ثم أعد المحاولة.");
+      } else if (/10:|DEVELOPER_ERROR/i.test(msg)) {
+        setError("إعداد جوجل غير مكتمل (بصمة SHA-1 غير مسجّلة في Firebase لهذا التطبيق).");
       } else {
-        setError(`خطأ Google: ${code || (err instanceof Error ? err.message : "غير معروف")}`);
+        setError(`خطأ Google: ${code || msg || "غير معروف"}`);
       }
     } finally {
       setLoading(false);
@@ -229,21 +255,19 @@ export default function SignupForm() {
           </button>
         </form>
 
-        {/* T2.5: زر Google ثابت الظهور — يُعطّل برسالة لا يختفي */}
+        {/* زر Google: يشتغل على الويب (popup) وداخل التطبيق (شاشة جوجل الأصلية) */}
         <button
           type="button"
           onClick={handleGoogle}
-          disabled={loading || !isFirebaseConfigured || isNative}
+          disabled={loading || !isFirebaseConfigured}
           className="mt-3 flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 bg-white py-3 text-sm font-bold text-neutral-700 shadow-sm hover:bg-neutral-50 disabled:opacity-50"
         >
           <GoogleIcon />
           {loading ? "جارٍ…" : "التسجيل مع Google"}
         </button>
-        {(isNative || !isFirebaseConfigured) && (
+        {!isFirebaseConfigured && (
           <p className="mt-2 text-center text-xs text-neutral-500">
-            {isNative
-              ? "التسجيل عبر Google غير متاح داخل التطبيق — استخدم البريد وكلمة المرور."
-              : "Google غير متاح: لم تُضبط مفاتيح Firebase."}
+            Google غير متاح: لم تُضبط مفاتيح Firebase.
           </p>
         )}
 
