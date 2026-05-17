@@ -224,8 +224,9 @@ export default function CheckoutStepper() {
       }
 
       if (!response.ok) {
-        const errBody = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(errBody?.error ?? "تعذر حفظ الطلب في قاعدة البيانات.");
+        const errBody = (await response.json().catch(() => null)) as { error?: string; issues?: string[] } | null;
+        const detail = errBody?.issues?.length ? ` (${errBody.issues.join(", ")})` : "";
+        throw new Error((errBody?.error ?? "تعذر حفظ الطلب في قاعدة البيانات.") + detail);
       }
 
       const created = (await response.json()) as {

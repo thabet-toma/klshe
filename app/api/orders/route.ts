@@ -39,7 +39,8 @@ export async function POST(request: Request) {
     const raw = await request.json();
     const parsed = createOrderSchema.safeParse(raw);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Invalid order payload." }, { status: 400, headers: corsHeaders(origin) });
+      const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+      return NextResponse.json({ error: "Invalid order payload.", issues }, { status: 400, headers: corsHeaders(origin) });
     }
     payload = parsed.data;
   } catch {
