@@ -26,9 +26,7 @@ export default async function SearchPage({
 
   const { vendors: rawVendors, products } = await searchStorefront(q);
   const vendors = rawVendors.filter((v) => {
-    if (openNow) {
-      // TODO: replace with real schedule check against opening_hours field.
-    }
+    if (openNow && v.is_open === false) return false;
     if (freeDelivery && v.delivery_fee_base > 0) return false;
     if (ratingMin > 0 && (v.rating_avg ?? 0) < ratingMin) return false;
     if (minOrderMax > 0 && v.min_order_amount > minOrderMax) return false;
