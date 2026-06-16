@@ -122,9 +122,26 @@ export default function VendorOrdersClient() {
 
   if (ctxLoading || (activeVendorId && loading)) {
     return (
-      <div className="rounded-3xl bg-white p-10 text-center text-sm text-neutral-500 ring-1 ring-black/5">
-        جارٍ تحميل الطلبات…
-      </div>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <li
+            key={i}
+            className="flex flex-col rounded-3xl bg-white p-4 shadow-soft ring-1 ring-black/5"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="h-11 w-11 animate-pulse rounded-2xl bg-neutral-200" />
+              <div className="h-6 w-16 animate-pulse rounded-full bg-neutral-100" />
+            </div>
+            <div className="mt-3 h-4 w-32 animate-pulse rounded bg-neutral-200" />
+            <div className="mt-2 h-3 w-24 animate-pulse rounded bg-neutral-100" />
+            <div className="mt-2 h-3 w-40 animate-pulse rounded bg-neutral-100" />
+            <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3">
+              <div className="h-3 w-20 animate-pulse rounded bg-neutral-100" />
+              <div className="h-4 w-14 animate-pulse rounded bg-neutral-200" />
+            </div>
+          </li>
+        ))}
+      </ul>
     );
   }
 
