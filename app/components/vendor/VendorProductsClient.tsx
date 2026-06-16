@@ -79,8 +79,18 @@ export default function VendorProductsClient() {
 
   if (ctxLoading || (activeVendorId && loading)) {
     return (
-      <div className="rounded-3xl bg-white p-10 text-center text-sm text-neutral-500 ring-1 ring-black/5">
-        جارٍ تحميل المنتجات…
+      <div className="overflow-hidden rounded-3xl bg-white shadow-soft ring-1 ring-black/5" aria-busy="true">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center gap-3 border-b border-neutral-50 px-4 py-3 last:border-0">
+            <div className="h-12 w-12 shrink-0 animate-pulse rounded-xl bg-neutral-200" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-40 animate-pulse rounded bg-neutral-200" />
+              <div className="h-3 w-24 animate-pulse rounded bg-neutral-100" />
+            </div>
+            <div className="h-4 w-16 animate-pulse rounded bg-neutral-100" />
+            <div className="h-6 w-14 animate-pulse rounded-full bg-neutral-100" />
+          </div>
+        ))}
       </div>
     );
   }
