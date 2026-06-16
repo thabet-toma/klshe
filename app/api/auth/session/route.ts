@@ -8,6 +8,14 @@ import { log } from "@/lib/log";
 
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+const SERVICE_UNAVAILABLE_MSG = "الخدمة غير متاحة مؤقتاً. حاول مجدداً بعد قليل.";
+
+/** A supabase-js error caused by the DB being unreachable (e.g. project paused) surfaces as a raw fetch failure. */
+function isConnectivityError(err: { message?: string } | null | undefined): boolean {
+  const m = err?.message ?? "";
+  return /fetch failed|failed to fetch|ENOTFOUND|ECONNREFUSED|ETIMEDOUT|network/i.test(m);
+}
+
 /** Convert a Firebase UID (alphanumeric) to a deterministic UUID v5-like string. */
 function firebaseUidToUuid(uid: string): string {
   const hash = createHash("sha1").update("firebase:" + uid).digest("hex");
@@ -64,13 +72,22 @@ export async function POST(request: Request) {
   const profileId = firebaseUidToUuid(uid);
 
   const supabase = createServerSupabase();
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", profileId)
     .maybeSingle();
 
-  let role = existing?.role ?? "customer";
+  if (selectError) {
+    if (isConnectivityError(selectError)) {
+      log.warn("auth_db_unreachable", { stage: "select", message: selectError.message });
+      return NextResponse.json({ error: SERVICE_UNAVAILABLE_MSG }, { status: 503 });
+    }
+    log.error("auth_profile_select_failed", { message: selectError.message });
+    return NextResponse.json({ error: "تعذّر إكمال تسجيل الدخول." }, { status: 500 });
+  }
+
+  const role = existing?.role ?? "customer";
 
   if (!existing) {
     const { error: insertError } = await supabase.from("profiles").insert({
@@ -79,7 +96,12 @@ export async function POST(request: Request) {
       role: "customer",
     });
     if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      if (isConnectivityError(insertError)) {
+        log.warn("auth_db_unreachable", { stage: "insert", message: insertError.message });
+        return NextResponse.json({ error: SERVICE_UNAVAILABLE_MSG }, { status: 503 });
+      }
+      log.error("auth_profile_insert_failed", { message: insertError.message });
+      return NextResponse.json({ error: "تعذّر إكمال تسجيل الدخول." }, { status: 500 });
     }
   }
 

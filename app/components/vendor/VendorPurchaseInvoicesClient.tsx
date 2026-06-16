@@ -41,6 +41,7 @@ export default function VendorPurchaseInvoicesClient() {
   const [paid, setPaid] = useState("0");
   const [note, setNote] = useState("");
   const [items, setItems] = useState<ItemDraft[]>([newItem()]);
+  const [dup, setDup] = useState<{ newIdx: number; existingIdx: number; name: string } | null>(null);
 
   function vendorParam(path: string) {
     return activeVendorId ? `${path}${path.includes("?") ? "&" : "?"}vendorId=${activeVendorId}` : path;
@@ -85,6 +86,47 @@ export default function VendorPurchaseInvoicesClient() {
 
   function updateItem(idx: number, patch: Partial<ItemDraft>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  }
+
+  function selectProduct(idx: number, productId: string) {
+    const p = products.find((x) => x.id === productId);
+    const name = p?.name ?? "";
+    if (productId) {
+      const existingIdx = items.findIndex((it, i) => i !== idx && it.productId === productId);
+      if (existingIdx !== -1) {
+        updateItem(idx, { productId, name });
+        setDup({ newIdx: idx, existingIdx, name });
+        return;
+      }
+    }
+    updateItem(idx, { productId, name: name || items[idx].name });
+  }
+
+  // (أ) دمج البند المكرر في البند الموجود: تُضاف كميته إلى الكمية الحالية ويُحذف السطر الجديد.
+  function mergeDuplicate() {
+    if (!dup) return;
+    const { newIdx, existingIdx } = dup;
+    setItems((prev) => {
+      const addQty = Number(prev[newIdx]?.qty) || 1;
+      return prev
+        .map((it, i) =>
+          i === existingIdx ? { ...it, qty: String((Number(it.qty) || 0) + addQty) } : it,
+        )
+        .filter((_, i) => i !== newIdx);
+    });
+    setDup(null);
+  }
+
+  // (ب) إبقاؤه بنداً منفصلاً (قد يختلف سعر الوحدة) — لا تغيير، فقط أغلق الحوار.
+  function keepSeparate() {
+    setDup(null);
+  }
+
+  // إلغاء: تراجع عن اختيار المنتج في السطر الجديد.
+  function cancelDuplicate() {
+    if (!dup) return;
+    updateItem(dup.newIdx, { productId: "" });
+    setDup(null);
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -162,13 +204,7 @@ export default function VendorPurchaseInvoicesClient() {
             >
               <select
                 value={item.productId}
-                onChange={(e) => {
-                  const p = products.find((x) => x.id === e.target.value);
-                  updateItem(idx, {
-                    productId: e.target.value,
-                    name: p?.name ?? item.name,
-                  });
-                }}
+                onChange={(e) => selectProduct(idx, e.target.value)}
                 className="rounded-lg border border-black/10 bg-white px-2 py-2 text-sm sm:col-span-3"
               >
                 <option value="">— ربط بمنتج —</option>
@@ -312,6 +348,41 @@ export default function VendorPurchaseInvoicesClient() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {dup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-card ring-1 ring-black/5">
+            <p className="text-sm font-extrabold text-neutral-900">المنتج مُضاف مسبقاً</p>
+            <p className="mt-2 text-sm text-neutral-600">
+              «{dup.name}» موجود بالفعل في هذه الفاتورة. هل تريد دمجه في البند الموجود (زيادة الكمية)،
+              أم إضافته كبند منفصل (قد يختلف سعر الوحدة)؟
+            </p>
+            <div className="mt-4 grid gap-2">
+              <button
+                type="button"
+                onClick={mergeDuplicate}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-extrabold text-white hover:bg-blue-700"
+              >
+                دمج في البند الموجود
+              </button>
+              <button
+                type="button"
+                onClick={keepSeparate}
+                className="rounded-xl bg-neutral-100 px-4 py-2 text-sm font-extrabold text-neutral-800 hover:bg-neutral-200"
+              >
+                إضافته كبند منفصل
+              </button>
+              <button
+                type="button"
+                onClick={cancelDuplicate}
+                className="rounded-xl px-4 py-2 text-sm font-bold text-neutral-500 hover:text-neutral-700"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
