@@ -28,6 +28,7 @@ export type VendorSummary = {
   /** مسافة تقريبية بالمتر — عند طلب «متاجر قريبة» فقط */
   distance_m?: number;
   rating_avg?: number;
+  is_open?: boolean;
 };
 
 /** أنواع المتاجر (mock / بدون Supabase) — يطابق بذور migration_004. */
@@ -151,6 +152,7 @@ export function mapVendor(row: {
   location_lat?: number | null;
   location_lng?: number | null;
   rating_avg?: number | null;
+  is_open?: boolean | null;
 }): VendorSummary {
   const cat =
     row.vendor_category_id && row.vendor_category_id.length > 0
@@ -169,6 +171,7 @@ export function mapVendor(row: {
     delivery_fee_base: Number(row.delivery_fee_base),
     rating_avg:
       typeof row.rating_avg === "number" ? Number(row.rating_avg.toFixed(1)) : undefined,
+    is_open: row.is_open ?? true,
   };
 }
 
@@ -407,7 +410,7 @@ export async function getRelatedProducts(
 }
 
 const VENDOR_LIST_SELECT =
-  "id, slug, name, description, logo_url, banner_url, category_id, vendor_category_id, default_prep_minutes, min_order_amount, delivery_fee_base" as const;
+  "id, slug, name, description, logo_url, banner_url, category_id, vendor_category_id, default_prep_minutes, min_order_amount, delivery_fee_base, is_open" as const;
 
 async function getFeaturedVendorsImpl(limit = 8): Promise<VendorSummary[]> {
   if (!isSupabaseServerConfigured) {
