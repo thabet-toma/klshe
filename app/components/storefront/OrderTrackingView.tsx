@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Bike, Check, ChefHat, Clock, Home, MapPin, PackageCheck, Phone, Receipt } from "lucide-react";
+import { ArrowRight, Bike, Check, ChefHat, Clock, Home, MapPin, PackageCheck, Phone, Receipt, Star } from "lucide-react";
 import { statusLabels, statusStyles } from "@/lib/order-status";
 import { formatPrice } from "@/lib/data";
 import type { OrderStatus } from "@/lib/types";
@@ -61,6 +61,7 @@ const orderOf = ["new", "accepted", "preparing", "ready", "dispatched", "on_way"
 
 export default function OrderTrackingView({ orderId }: Props) {
   const openCart = useCart((s) => s.open);
+  const [loaded, setLoaded] = useState(false);
   const [order, setOrder] = useState<ApiOrder | null>(null);
   const [driver, setDriver] = useState<ApiDriver | null>(null);
   const [driverLat, setDriverLat] = useState<number | null>(null);
@@ -96,7 +97,10 @@ export default function OrderTrackingView({ orderId }: Props) {
           setDriverRating(json.rating.driver_rating ?? 5);
           setComment(json.rating.comment ?? "");
         }
-      } catch {}
+      } catch {
+      } finally {
+        if (active) setLoaded(true);
+      }
     }
     void pull();
 
@@ -197,7 +201,25 @@ export default function OrderTrackingView({ orderId }: Props) {
     window.sessionStorage.setItem(key, "1");
   }, [model, orderId]);
 
-  if (!model) return <div className="mx-auto w-full max-w-screen-md px-4 py-12 text-center"><p className="text-base font-extrabold">الطلب غير موجود</p><Link href="/orders" className="mt-3 inline-flex rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-extrabold text-white shadow-pop">العودة إلى طلباتي</Link></div>;
+  if (!model) {
+    if (!loaded) {
+      return (
+        <div className="mx-auto w-full max-w-screen-md px-4 pb-10" aria-busy="true">
+          <div className="flex items-center gap-2 pt-2">
+            <div className="h-10 w-10 animate-pulse rounded-2xl bg-neutral-200" />
+            <div className="space-y-1.5">
+              <div className="h-4 w-28 animate-pulse rounded bg-neutral-200" />
+              <div className="h-3 w-20 animate-pulse rounded bg-neutral-100" />
+            </div>
+          </div>
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="mt-4 h-32 animate-pulse rounded-2xl bg-neutral-100" />
+          ))}
+        </div>
+      );
+    }
+    return <div className="mx-auto w-full max-w-screen-md px-4 py-12 text-center"><p className="text-base font-extrabold">الطلب غير موجود</p><Link href="/orders" className="mt-3 inline-flex rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-extrabold text-white shadow-pop">العودة إلى طلباتي</Link></div>;
+  }
 
   const shownDriver = driver
     ? { name: driver.name, phone: driver.phone, vehicle: driver.vehicle }
@@ -356,29 +378,15 @@ export default function OrderTrackingView({ orderId }: Props) {
       {model.status === "delivered" && (
         <section className="mt-4 rounded-2xl bg-white p-4 shadow-soft ring-1 ring-black/5">
           <h2 className="mb-3 text-sm font-extrabold">تقييم الطلب</h2>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <label className="text-xs font-bold text-neutral-600">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="text-xs font-bold text-neutral-600">
               تقييم المتجر
-              <input
-                type="number"
-                min={1}
-                max={5}
-                value={vendorRating}
-                onChange={(e) => setVendorRating(Number(e.target.value))}
-                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-              />
-            </label>
-            <label className="text-xs font-bold text-neutral-600">
+              <StarPicker value={vendorRating} onChange={setVendorRating} disabled={ratingBusy} />
+            </div>
+            <div className="text-xs font-bold text-neutral-600">
               تقييم السائق
-              <input
-                type="number"
-                min={1}
-                max={5}
-                value={driverRating}
-                onChange={(e) => setDriverRating(Number(e.target.value))}
-                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm"
-              />
-            </label>
+              <StarPicker value={driverRating} onChange={setDriverRating} disabled={ratingBusy} />
+            </div>
           </div>
           <textarea
             value={comment}
@@ -460,6 +468,38 @@ export default function OrderTrackingView({ orderId }: Props) {
         </button>
         <Link href="/" className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white font-bold text-neutral-700 shadow-soft ring-1 ring-black/5 hover:bg-neutral-100"><Home className="h-5 w-5" strokeWidth={2.2} />العودة للرئيسية</Link>
       </div>
+    </div>
+  );
+}
+
+function StarPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="mt-1 flex items-center gap-1" role="radiogroup" aria-label="التقييم">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(n)}
+          role="radio"
+          aria-checked={value === n}
+          aria-label={`${n} من 5`}
+          className="rounded-md p-0.5 transition-transform active:scale-90 disabled:opacity-50"
+        >
+          <Star
+            className={`h-7 w-7 ${n <= value ? "fill-amber-400 text-amber-400" : "fill-neutral-100 text-neutral-300"}`}
+            strokeWidth={1.8}
+          />
+        </button>
+      ))}
     </div>
   );
 }
